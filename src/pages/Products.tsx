@@ -1,21 +1,104 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, PlusCircle, Edit, Trash2 } from "lucide-react";
+import { Package, PlusCircle, Edit, Trash2, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useStore } from "@/hooks/use-store";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { showError, showSuccess } from "@/utils/toast";
+import { deleteProductImage } from "@/integrations/supabase/storage";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Tipagem do Produto (simplificada para a listagem)
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  image_url: string | null;
+}
 
 const Products = () => {
-  // Placeholder data
-  const products = [
-    { id: 1, name: "Tênis Esportivo", price: 199.90, stock: 50, imageUrl: "/placeholder.svg" },
-    { id: 2, name: "Camiseta Dry-Fit", price: 79.90, stock: 120, imageUrl: "/placeholder.svg" },
-    { id: 3, name: "Relógio Smartwatch", price: 450.00, stock: 15, imageUrl: "/placeholder.svg" },
-  ];
+  const { store, loading: storeLoading } = useStore();
+  const queryClient = useQueryClient();
 
-  const handleDelete = (id: number) => {
-    console.log(`Deleting product ${id}`);
-    // Implementation to delete product from Supabase goes here
+  // Função de busca de produtos
+  const fetchProducts = async (): Promise<Product[]> => {
+    if (!store) return [];
+    
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, price, stock, image_url')
+      .eq('store_id', store.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+    
+    // Converte price de string para number
+    return data.map(p => ({
+      ...p,
+      price: parseFloat(p.price as unknown as string),
+    })) as Product[];
   };
+
+  const { data: products, isLoading, error } = useQuery({
+    queryKey: ['products', store?.id],
+    queryFn: fetchProducts,
+    enabled: !!store && !storeLoading,
+  });
+
+  // Mutação para exclusão
+  const deleteMutation = useMutation({
+    mutationFn: async (product: Product) => {
+      // 1. Deletar imagem do storage
+      if (product.image_url) {
+        await deleteProductImage(product.image_url);
+      }
+
+      // 2. Deletar registro do banco de dados
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', product.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      showSuccess("Produto excluído com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (err) => {
+      showError(`Erro ao excluir produto: ${err.message}`);
+    },
+  });
+
+  const handleDelete = (product: Product) => {
+    if (window.confirm(`Tem certeza que deseja excluir o produto "${product.name}"?`)) {
+      deleteMutation.mutate(product);
+    }
+  };
+
+  if (storeLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-6xl mx-auto">
+        <Skeleton className="h-8 w-64 mb-8" />
+        <div className="grid gap-6">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="p-8 text-center text-destructive">Erro ao carregar produtos: {error.message}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-6xl mx-auto">
@@ -38,10 +121,10 @@ const Products = () => {
       </header>
 
       <div className="grid gap-6">
-        {products.map((product) => (
+        {products && products.map((product) => (
           <Card key={product.id} className="flex items-center p-4 border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300">
             <img 
-              src={product.imageUrl} 
+              src={product.image_url || "/placeholder.svg"} 
               alt={product.name} 
               className="w-16 h-16 object-cover rounded-lg mr-4 border border-border"
             />
@@ -58,15 +141,20 @@ const Products = () => {
                   <Edit className="h-4 w-4" />
                 </Button>
               </Link>
-              <Button variant="destructive" size="icon" onClick={() => handleDelete(product.id)}>
-                <Trash2 className="h-4 w-4" />
+              <Button 
+                variant="destructive" 
+                size="icon" 
+                onClick={() => handleDelete(product)}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               </Button>
             </div>
           </Card>
         ))}
       </div>
       
-      {products.length === 0 && (
+      {products && products.length === 0 && (
         <p className="text-center text-muted-foreground mt-10 font-sans">Nenhum produto cadastrado ainda.</p>
       )}
     </div>

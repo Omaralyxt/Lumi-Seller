@@ -10,6 +10,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { deleteProductImage } from "@/integrations/supabase/storage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
+import EmptyState from "@/components/EmptyState";
 
 // Tipagem do Produto (simplificada para a listagem)
 interface Product {
@@ -122,42 +123,50 @@ const Products = () => {
         </Link>
       </header>
 
-      <div className="grid gap-6">
-        {products && products.map((product) => (
-          <Card key={product.id} className="flex items-center p-4 border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300">
-            <img 
-              src={product.image_url || "/placeholder.svg"} 
-              alt={product.name} 
-              className="w-16 h-16 object-cover rounded-lg mr-4 border border-border"
-            />
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-lg font-heading truncate">{product.name}</CardTitle>
-              <p className="text-sm text-muted-foreground font-sans">Estoque: {product.stock}</p>
-            </div>
-            <div className="text-right mr-4">
-              <p className="text-lg font-bold font-heading text-primary">R$ {product.price.toFixed(2)}</p>
-            </div>
-            <div className="flex space-x-2">
-              <Link to={`/adicionar-produto?id=${product.id}`}>
-                <Button variant="outline" size="icon">
-                  <Edit className="h-4 w-4" />
+      {products && products.length > 0 ? (
+        <div className="grid gap-6">
+          {products.map((product) => (
+            <Card key={product.id} className="flex items-center p-4 border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300">
+              <img 
+                src={product.image_url || "/placeholder.svg"} 
+                alt={product.name} 
+                className="w-16 h-16 object-cover rounded-lg mr-4 border border-border"
+              />
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-lg font-heading truncate">{product.name}</CardTitle>
+                <p className="text-sm text-muted-foreground font-sans">Estoque: {product.stock}</p>
+              </div>
+              <div className="text-right mr-4">
+                <p className="text-lg font-bold font-heading text-primary">R$ {product.price.toFixed(2)}</p>
+              </div>
+              <div className="flex space-x-2">
+                <Link to={`/adicionar-produto?id=${product.id}`}>
+                  <Button variant="outline" size="icon">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Button 
+                  variant="destructive" 
+                  size="icon" 
+                  onClick={() => handleDelete(product)}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 </Button>
-              </Link>
-              <Button 
-                variant="destructive" 
-                size="icon" 
-                onClick={() => handleDelete(product)}
-                disabled={deleteMutation.isPending}
-              >
-                {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-      
-      {products && products.length === 0 && (
-        <p className="text-center text-muted-foreground mt-10 font-sans">Nenhum produto cadastrado ainda.</p>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-10">
+          <EmptyState
+            icon={Package}
+            title="Nenhum Produto Cadastrado"
+            description="Parece que sua loja ainda não tem produtos. Comece a vender adicionando seu primeiro item!"
+            actionText="Adicionar Primeiro Produto"
+            actionLink="/adicionar-produto"
+          />
+        </div>
       )}
     </div>
   );

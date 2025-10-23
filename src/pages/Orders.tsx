@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 // Tipagem do Pedido
 interface Order {
@@ -20,6 +21,7 @@ interface Order {
 }
 
 const Orders = () => {
+  usePageTitle("Pedidos");
   const { store, loading: storeLoading } = useStore();
   const queryClient = useQueryClient();
 

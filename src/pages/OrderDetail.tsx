@@ -9,6 +9,7 @@ import { showError } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useParams, useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 // Tipagem do Pedido (detalhada)
 interface Order {
@@ -44,6 +45,8 @@ const OrderDetail = () => {
   const { id: orderId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { store, loading: storeLoading } = useStore();
+  
+  usePageTitle(`Pedido #${orderId ? orderId.substring(0, 8) : 'Detalhes'}`);
 
   // Função de busca de pedido único
   const fetchOrder = async (): Promise<Order | null> => {

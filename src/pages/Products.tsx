@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { deleteProductImage } from "@/integrations/supabase/storage";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 // Tipagem do Produto (simplificada para a listagem)
 interface Product {
@@ -20,6 +21,7 @@ interface Product {
 }
 
 const Products = () => {
+  usePageTitle("Produtos");
   const { store, loading: storeLoading } = useStore();
   const queryClient = useQueryClient();
 

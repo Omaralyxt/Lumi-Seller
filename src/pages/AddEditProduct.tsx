@@ -16,6 +16,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 // Tipagem do Produto
 interface Product {
@@ -53,6 +54,8 @@ const AddEditProduct = () => {
   const location = useLocation();
   const productId = new URLSearchParams(location.search).get('id');
   
+  usePageTitle(productId ? "Editar Produto" : "Adicionar Produto");
+
   const { store, loading: storeLoading } = useStore();
   const { profile } = useAuth();
   

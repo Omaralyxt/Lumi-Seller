@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 // Tipagem do Pedido (simplificada)
 interface Order {
@@ -90,6 +91,7 @@ const getStatusBadge = (status: Order['status']) => {
 };
 
 const Dashboard = () => {
+  usePageTitle("Dashboard");
   const { profile } = useAuth();
   const { store, loading: storeLoading } = useStore();
   

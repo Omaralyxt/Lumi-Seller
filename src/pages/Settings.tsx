@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { deleteProductImage, uploadProductImage } from "@/integrations/supabase/storage"; // Reutilizando funções de storage
 import { showSuccess } from "@/utils/toast";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 // Esquema de Validação para Configurações da Loja
 const storeSettingsSchema = z.object({
@@ -36,6 +37,7 @@ const profileSettingsSchema = z.object({
 type ProfileSettingsFormValues = z.infer<typeof profileSettingsSchema>;
 
 const Settings = () => {
+  usePageTitle("Configurações");
   const navigate = useNavigate();
   const { store, loading: storeLoading, updateStore } = useStore();
   const { profile, loading: authLoading, updateProfile } = useAuth();

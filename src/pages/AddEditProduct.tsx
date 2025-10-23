@@ -338,8 +338,13 @@ const AddEditProduct = () => {
       if (updateResult.error) throw new Error(`Erro ao atualizar variantes: ${updateResult.error.message}`);
 
 
+      // Feedback e Redirecionamento
       showSuccess(`Produto ${productId ? 'atualizado' : 'criado'} com sucesso!`);
-      navigate('/produtos');
+      
+      // Adiciona um pequeno atraso para garantir que o toast seja visível
+      setTimeout(() => {
+        navigate('/produtos');
+      }, 500); // 500ms de atraso
 
     } catch (error) {
       console.error("Erro ao salvar produto:", error);

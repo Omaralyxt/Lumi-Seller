@@ -24,6 +24,14 @@ const queryClient = new QueryClient();
 const ProtectedLayout = () => {
   const { session, loading, profile } = useAuth();
 
+  // 4. Bloquear acessos indevidos (Lumi Seller)
+  useEffect(() => {
+    if (!loading && profile && profile.role !== 'seller') {
+      alert("Acesso restrito a vendedores. Você será desconectado.");
+      supabase.auth.signOut();
+    }
+  }, [loading, profile]);
+
   if (loading) {
     // Usando o novo LoadingSpinner
     return (
@@ -33,24 +41,10 @@ const ProtectedLayout = () => {
     );
   }
 
-  if (!session) {
+  if (!session || (profile && profile.role !== 'seller')) {
+    // Se não houver sessão OU se o perfil for carregado e não for 'seller', redireciona para login.
+    // O useEffect acima já cuida do logout, mas o Navigate garante o redirecionamento imediato.
     return <Navigate to="/login" replace />;
-  }
-  
-  // 4. Bloquear acessos indevidos (Lumi Seller)
-  if (profile && profile.role !== 'seller') {
-    // Use useEffect para executar o side effect (alert e sign out)
-    useEffect(() => {
-      alert("Acesso restrito a vendedores. Você será desconectado.");
-      supabase.auth.signOut();
-    }, [profile]);
-
-    // Mostra um spinner enquanto o sign out acontece e o redirecionamento é processado
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <LoadingSpinner size={48} />
-      </div>
-    );
   }
 
   return (

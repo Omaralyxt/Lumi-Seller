@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, DollarSign, Store, PlusCircle, Settings as SettingsIcon } from "lucide-react";
+import { Package, DollarSign, Store, PlusCircle, Settings as SettingsIcon, Eye, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,15 @@ import { useStore } from "@/hooks/use-store";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
+
+// Tipagem do Pedido (simplificada)
+interface Order {
+  id: string;
+  total_amount: number;
+  status: 'pending' | 'paid' | 'shipped' | 'delivered';
+  created_at: string;
+}
 
 // Função para buscar métricas do dashboard
 const fetchDashboardMetrics = async (storeId: string) => {
@@ -46,17 +55,59 @@ const fetchDashboardMetrics = async (storeId: string) => {
   };
 };
 
+// Função para buscar pedidos recentes
+const fetchRecentOrders = async (storeId: string): Promise<Order[]> => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, total_amount, status, created_at')
+    .eq('store_id', storeId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data.map(o => ({
+    ...o,
+    total_amount: parseFloat(o.total_amount as unknown as string),
+  })) as Order[];
+};
+
+const getStatusBadge = (status: Order['status']) => {
+  switch (status) {
+    case 'paid':
+      return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Pago</Badge>;
+    case 'pending':
+      return <Badge variant="secondary">Pendente</Badge>;
+    case 'shipped':
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Enviado</Badge>;
+    case 'delivered':
+      return <Badge className="bg-green-500 hover:bg-green-600">Entregue</Badge>;
+    default:
+      return <Badge variant="outline">{status}</Badge>;
+  }
+};
+
 const Dashboard = () => {
   const { profile } = useAuth();
   const { store, loading: storeLoading } = useStore();
   
+  const enabled = !!store && !storeLoading;
+
   const { data: metrics, isLoading: metricsLoading, error: metricsError } = useQuery({
     queryKey: ['dashboardMetrics', store?.id],
     queryFn: () => fetchDashboardMetrics(store!.id),
-    enabled: !!store && !storeLoading,
+    enabled: enabled,
   });
 
-  if (storeLoading || metricsLoading) {
+  const { data: recentOrders, isLoading: ordersLoading, error: ordersError } = useQuery({
+    queryKey: ['recentOrders', store?.id],
+    queryFn: () => fetchRecentOrders(store!.id),
+    enabled: enabled,
+  });
+
+  if (storeLoading || metricsLoading || ordersLoading) {
     return (
       <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-6xl mx-auto">
         <header className="mb-8">
@@ -73,8 +124,8 @@ const Dashboard = () => {
     );
   }
 
-  if (metricsError) {
-    return <div className="p-8 text-center text-destructive">Erro ao carregar métricas: {metricsError.message}</div>;
+  if (metricsError || ordersError) {
+    return <div className="p-8 text-center text-destructive">Erro ao carregar dados do dashboard: {metricsError?.message || ordersError?.message}</div>;
   }
 
   const storeName = store?.name || "Carregando Loja...";
@@ -141,16 +192,48 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Product List Preview (Placeholder) */}
+      {/* Recent Orders List */}
       <section>
-        <h2 className="text-2xl font-heading font-bold mb-4">Seus Produtos</h2>
+        <h2 className="text-2xl font-heading font-bold mb-4">Pedidos Recentes</h2>
         <Card>
-          <CardContent className="p-4">
-            <p className="text-muted-foreground font-sans">
-              Listagem de produtos virá aqui. <Link to="/produtos" className="text-primary hover:underline">Ver todos os produtos.</Link>
-            </p>
+          <CardContent className="p-0">
+            {recentOrders && recentOrders.length > 0 ? (
+              <div className="divide-y divide-border">
+                {recentOrders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-sm font-medium font-sans">
+                        #{order.id.substring(0, 8)}...
+                      </div>
+                      <div className="hidden sm:block">
+                        {getStatusBadge(order.status)}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="text-lg font-bold font-heading text-primary">
+                        R$ {order.total_amount.toFixed(2)}
+                      </div>
+                      <Link to={`/pedidos/${order.id}`}>
+                        <Button size="sm" variant="outline" title="Ver Detalhes">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground p-6 font-sans">
+                Nenhum pedido recente encontrado.
+              </p>
+            )}
           </CardContent>
         </Card>
+        <div className="mt-4 text-right">
+          <Link to="/pedidos" className="text-primary hover:underline text-sm font-sans">
+            Ver todos os pedidos &rarr;
+          </Link>
+        </div>
       </section>
     </div>
   );

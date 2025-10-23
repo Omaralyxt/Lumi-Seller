@@ -15,12 +15,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import Layout from "./components/Layout"; // Importando o novo Layout
 import LoadingSpinner from "./components/LoadingSpinner"; // Importando LoadingSpinner
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
 // Componente para proteger rotas e aplicar o layout
 const ProtectedLayout = () => {
-  const { session, loading } = useAuth();
+  const { session, loading, profile } = useAuth();
 
   if (loading) {
     // Usando o novo LoadingSpinner
@@ -33,6 +35,22 @@ const ProtectedLayout = () => {
 
   if (!session) {
     return <Navigate to="/login" replace />;
+  }
+  
+  // 4. Bloquear acessos indevidos (Lumi Seller)
+  if (profile && profile.role !== 'seller') {
+    // Use useEffect para executar o side effect (alert e sign out)
+    useEffect(() => {
+      alert("Acesso restrito a vendedores. Você será desconectado.");
+      supabase.auth.signOut();
+    }, [profile]);
+
+    // Mostra um spinner enquanto o sign out acontece e o redirecionamento é processado
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <LoadingSpinner size={48} />
+      </div>
+    );
   }
 
   return (

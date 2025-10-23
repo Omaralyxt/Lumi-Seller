@@ -237,7 +237,8 @@ const OrderDetail = () => {
   }
 
   const subtotal = items?.reduce((sum, item) => sum + (item.price_at_purchase * item.quantity), 0) || 0;
-  const shippingCost = order.total_amount - subtotal;
+  // Garante que o frete não seja negativo, embora o total_amount deva ser >= subtotal
+  const shippingCost = Math.max(0, order.total_amount - subtotal); 
 
   const customerName = customer?.full_name || 'Cliente Não Encontrado';
   const customerEmail = customer?.email || 'N/A';

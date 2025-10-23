@@ -28,6 +28,18 @@ interface OrderItem {
   price_at_purchase: number;
 }
 
+// Tipagem do Cliente
+interface Customer {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  shipping_address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+}
+
 const OrderDetail = () => {
   const { id: orderId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -77,6 +89,23 @@ const OrderDetail = () => {
     })) as OrderItem[];
   };
 
+  // Função de busca dos dados do cliente
+  const fetchCustomer = async (customerId: string): Promise<Customer | null> => {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', customerId)
+      .single();
+
+    if (error) {
+      if (error.code !== 'PGRST116') {
+        console.error("Erro ao buscar cliente:", error);
+      }
+      return null;
+    }
+    return data as Customer;
+  };
+
   const { data: order, isLoading: isOrderLoading, error: orderError } = useQuery({
     queryKey: ['order', orderId, store?.id],
     queryFn: fetchOrder,
@@ -87,6 +116,12 @@ const OrderDetail = () => {
     queryKey: ['orderItems', orderId, store?.id],
     queryFn: fetchOrderItems,
     enabled: !!order && !isOrderLoading,
+  });
+
+  const { data: customer, isLoading: isCustomerLoading, error: customerError } = useQuery({
+    queryKey: ['customer', order?.customer_id],
+    queryFn: () => fetchCustomer(order!.customer_id!),
+    enabled: !!order?.customer_id && !isOrderLoading,
   });
 
   const getStatusBadge = (status: Order['status']) => {
@@ -104,7 +139,7 @@ const OrderDetail = () => {
     }
   };
 
-  if (storeLoading || isOrderLoading || isItemsLoading) {
+  if (storeLoading || isOrderLoading || isItemsLoading || (order?.customer_id && isCustomerLoading)) {
     return (
       <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-4xl mx-auto">
         <Skeleton className="h-8 w-48 mb-8" />
@@ -117,8 +152,8 @@ const OrderDetail = () => {
     );
   }
 
-  if (orderError || itemsError) {
-    showError(`Erro ao carregar detalhes do pedido: ${orderError?.message || itemsError?.message}`);
+  if (orderError || itemsError || customerError) {
+    showError(`Erro ao carregar detalhes do pedido: ${orderError?.message || itemsError?.message || customerError?.message}`);
     return <div className="p-8 text-center text-destructive">Erro ao carregar pedido.</div>;
   }
 
@@ -127,9 +162,14 @@ const OrderDetail = () => {
   }
 
   const subtotal = items?.reduce((sum, item) => sum + (item.price_at_purchase * item.quantity), 0) || 0;
-  // Assumindo que o total_amount inclui o custo de envio, mas como não temos essa informação no item, 
-  // vamos calcular a diferença como um placeholder para o frete.
+  // Calculamos o custo de envio como a diferença, assumindo que o total inclui o frete.
   const shippingCost = order.total_amount - subtotal;
+
+  const customerName = customer?.full_name || 'Cliente Não Encontrado';
+  const customerEmail = customer?.email || 'N/A';
+  const shippingAddress = customer ? 
+    `${customer.shipping_address}, ${customer.city} - ${customer.state}, ${customer.zip_code}` : 
+    'Endereço de envio não disponível.';
 
 
   return (
@@ -178,11 +218,10 @@ const OrderDetail = () => {
               <CardTitle className="font-heading text-xl flex items-center"><User className="h-5 w-5 mr-2" /> Cliente</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="font-bold">ID do Cliente: {order.customer_id ? order.customer_id.substring(0, 8) : 'Convidado'}</p>
+              <p className="font-bold">{customerName}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {/* Placeholder para dados do cliente, pois não temos a tabela de endereços */}
-                Nome: [Nome do Cliente]<br/>
-                Email: [Email do Cliente]
+                Email: {customerEmail}<br/>
+                ID: {order.customer_id ? order.customer_id.substring(0, 8) : 'N/A'}
               </p>
             </CardContent>
           </Card>
@@ -218,11 +257,11 @@ const OrderDetail = () => {
               <CardTitle className="font-heading text-xl flex items-center"><MapPin className="h-5 w-5 mr-2" /> Endereço de Envio</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                [Endereço de envio completo do cliente]
+              <p className="text-muted-foreground whitespace-pre-line">
+                {shippingAddress}
               </p>
               <p className="mt-2 text-sm font-bold">
-                Rastreamento: [Código de Rastreio]
+                Rastreamento: [Código de Rastreio Placeholder]
               </p>
             </CardContent>
           </Card>

@@ -1,11 +1,24 @@
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
-import { Fingerprint } from 'lucide-react';
+import { Fingerprint, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { signInAsGuest } from '@/integrations/supabase/auth';
+import { useNavigate } from 'react-router-dom';
 
 const SupabaseAuth = () => {
+  const navigate = useNavigate();
+
+  const handleGuestLogin = async () => {
+    const { success } = await signInAsGuest();
+    if (success) {
+      // O useAuth hook no App.tsx deve pegar a sessão e redirecionar, 
+      // mas forçamos a navegação para garantir a transição imediata.
+      navigate('/dashboard', { replace: true });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <div className={cn(
@@ -20,8 +33,17 @@ const SupabaseAuth = () => {
           </p>
         </div>
         
-        {/* Biometric Login Placeholder */}
+        {/* Guest Login Button */}
         <div className="space-y-3">
+          <Button 
+            variant="secondary" 
+            className="w-full font-heading text-lg py-6 border-2 border-secondary/50 hover:bg-secondary/80 transition-all duration-300"
+            onClick={handleGuestLogin}
+          >
+            <User className="mr-2 h-5 w-5" /> Entrar como Convidado
+          </Button>
+          
+          {/* Biometric Login Placeholder */}
           <Button 
             variant="outline" 
             className="w-full font-heading text-lg py-6 border-2 border-primary/50 hover:bg-primary/10 transition-all duration-300"

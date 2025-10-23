@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { LogOut, Save, Store, User, Loader2, Image as ImageIcon, Trash2 } from "lucide-react";
+import { LogOut, Save, Store, User, Loader2, Image as ImageIcon, Trash2, Mail } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ import * as z from "zod";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { deleteProductImage, uploadProductImage } from "@/integrations/supabase/storage";
-import { showSuccess } from "@/utils/toast";
+import { showSuccess, showError } from "@/utils/toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 
 // Esquema de Validação para Configurações da Loja
@@ -98,6 +98,7 @@ const Settings = () => {
     if (file) {
       setPreviewLogo(URL.createObjectURL(file));
     } else {
+      // Se o usuário limpar a seleção, volta para a URL original do store
       setPreviewLogo(storeForm.getValues('logo_url'));
     }
   };
@@ -105,11 +106,16 @@ const Settings = () => {
   const handleRemoveLogo = async () => {
     const currentUrl = storeForm.getValues('logo_url');
     if (currentUrl) {
-      await deleteProductImage(currentUrl); 
+      const deleted = await deleteProductImage(currentUrl); 
+      if (!deleted) {
+        showError("Falha ao remover logo do storage.");
+        return;
+      }
     }
     setFileToUpload(null);
     setPreviewLogo(null);
-    storeForm.setValue('logo_url', null);
+    storeForm.setValue('logo_url', null, { shouldDirty: true }); // Marca como dirty para salvar o null
+    showSuccess("Logotipo removido. Salve as configurações para confirmar.");
   };
 
   const handleSaveStore = async (values: StoreSettingsFormValues) => {
@@ -121,6 +127,7 @@ const Settings = () => {
     try {
       // 1. Upload do novo logotipo, se houver
       if (fileToUpload) {
+        // Se já existia uma URL, deletamos a antiga ANTES de fazer o upload da nova
         if (values.logo_url) {
           await deleteProductImage(values.logo_url);
         }
@@ -133,14 +140,25 @@ const Settings = () => {
       }
 
       // 2. Atualizar dados da loja
-      await updateStore({
+      const success = await updateStore({
         name: values.name,
         description: values.description,
         logo_url: logoUrl,
       });
+      
+      if (success) {
+        // Se a atualização do store foi bem-sucedida, resetamos o formulário com os novos valores
+        storeForm.reset({
+            name: values.name,
+            description: values.description,
+            logo_url: logoUrl,
+        });
+        setPreviewLogo(logoUrl); // Atualiza o preview com a URL final
+      }
 
     } catch (error) {
       console.error("Erro ao salvar configurações da loja:", error);
+      showError(`Erro ao salvar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setIsSavingStore(false);
       setFileToUpload(null); // Limpa o arquivo após o upload
@@ -151,7 +169,10 @@ const Settings = () => {
   const handleSaveProfile = async (values: ProfileSettingsFormValues) => {
     setIsSavingProfile(true);
     try {
-      await updateProfile(values);
+      const success = await updateProfile(values);
+      if (success) {
+        profileForm.reset(values); // Resetar o formulário se o save for bem-sucedido
+      }
     } finally {
       setIsSavingProfile(false);
     }

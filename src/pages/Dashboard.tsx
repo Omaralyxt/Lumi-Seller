@@ -4,15 +4,36 @@ import { Package, DollarSign, Store, PlusCircle, Settings as SettingsIcon } from
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
+import { useStore } from "@/hooks/use-store";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Dashboard = () => {
   const { profile } = useAuth();
+  const { store, loading: storeLoading } = useStore();
   
-  // Placeholder data
-  const storeName = "Minha Loja Lumi";
+  // Placeholder data (will be replaced by real data fetching later)
   const balance = 1250.75;
   const productCount = 42;
   const pendingOrders = 5;
+
+  if (storeLoading) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-6xl mx-auto">
+        <header className="mb-8">
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-6 w-96" />
+        </header>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
+
+  const storeName = store?.name || "Carregando Loja...";
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 font-sans">

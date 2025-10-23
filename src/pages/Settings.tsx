@@ -40,7 +40,7 @@ const Settings = () => {
   usePageTitle("Configurações");
   const navigate = useNavigate();
   const { store, loading: storeLoading, updateStore } = useStore();
-  const { profile, loading: authLoading, updateProfile } = useAuth();
+  const { profile, loading: authLoading, updateProfile, session } = useAuth(); // Adicionado 'session'
   
   const [isSavingStore, setIsSavingStore] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -242,7 +242,7 @@ const Settings = () => {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email (Não Editável)</Label>
-              <Input id="email" type="email" placeholder={profile?.session?.user.email || "N/A"} className="font-sans rounded-lg" disabled />
+              <Input id="email" type="email" placeholder={session?.user.email || "N/A"} className="font-sans rounded-lg" disabled />
             </div>
             <Button type="submit" className="w-full font-heading rounded-xl neon-glow" disabled={isSavingProfile}>
               {isSavingProfile ? (

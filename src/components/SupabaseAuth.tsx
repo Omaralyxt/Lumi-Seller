@@ -77,12 +77,12 @@ const SupabaseAuth = () => {
                   inputBorderFocus: 'hsl(var(--ring))',
                 },
                 fontSizes: {
-                    base: '1rem',
+                    // Removido 'base'
                     large: '1.125rem',
                     xl: '1.25rem',
                 },
                 fonts: {
-                    body: 'Montserrat, sans-serif',
+                    // Removido 'body'
                     button: 'Bebas Neue, sans-serif',
                 }
               },

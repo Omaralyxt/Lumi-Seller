@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, DollarSign, Store, PlusCircle, Settings as SettingsIcon, Eye, Loader2 } from "lucide-react";
+import { Package, DollarSign, Store, PlusCircle, Settings as SettingsIcon, Eye, Loader2, ShoppingCart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { usePageTitle } from "@/hooks/use-page-title";
+import EmptyState from "@/components/EmptyState"; // Importando EmptyState
 
 // Tipagem do Pedido (simplificada)
 interface Order {
@@ -117,9 +118,9 @@ const Dashboard = () => {
           <Skeleton className="h-6 w-96" />
         </header>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-34 w-full" />
+          <Skeleton className="h-34 w-full" />
+          <Skeleton className="h-34 w-full" />
         </div>
         <Skeleton className="h-48 w-full" />
       </div>
@@ -225,17 +226,23 @@ const Dashboard = () => {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-muted-foreground p-6 font-sans">
-                Nenhum pedido recente encontrado.
-              </p>
+              <div className="p-6">
+                <EmptyState
+                  icon={ShoppingCart}
+                  title="Sem Pedidos Recentes"
+                  description="Nenhum pedido foi registrado recentemente. Continue promovendo seus produtos!"
+                />
+              </div>
             )}
           </CardContent>
         </Card>
-        <div className="mt-4 text-right">
-          <Link to="/pedidos" className="text-primary hover:underline text-sm font-sans">
-            Ver todos os pedidos &rarr;
-          </Link>
-        </div>
+        {recentOrders && recentOrders.length > 0 && (
+          <div className="mt-4 text-right">
+            <Link to="/pedidos" className="text-primary hover:underline text-sm font-sans">
+              Ver todos os pedidos &rarr;
+            </Link>
+          </div>
+        )}
       </section>
     </div>
   );

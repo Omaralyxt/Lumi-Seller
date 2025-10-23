@@ -10,19 +10,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { usePageTitle } from "@/hooks/use-page-title";
-import EmptyState from "@/components/EmptyState"; // Importando EmptyState
-
-// Tipagem do Pedido (simplificada)
-interface Order {
-  id: string;
-  total_amount: number;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered';
-  created_at: string;
-}
+import EmptyState from "@/components/EmptyState";
+import { Order } from "@/types/database"; // Importando Order do novo arquivo de tipagem
 
 // Função para buscar métricas do dashboard
 const fetchDashboardMetrics = async (storeId: string) => {
-  // 1. Contagem de Produtos Ativos
+  // 1. Contagem de Produtos Ativos (agora conta produtos principais)
   const { count: productCount, error: productError } = await supabase
     .from('products')
     .select('id', { count: 'exact', head: true })
@@ -79,15 +72,15 @@ const fetchRecentOrders = async (storeId: string): Promise<Order[]> => {
 const getStatusBadge = (status: Order['status']) => {
   switch (status) {
     case 'paid':
-      return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Pago</Badge>;
+      return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 rounded-full">Pago</Badge>;
     case 'pending':
-      return <Badge variant="secondary">Pendente</Badge>;
+      return <Badge variant="secondary" className="rounded-full">Pendente</Badge>;
     case 'shipped':
-      return <Badge className="bg-yellow-500 hover:bg-yellow-600">Enviado</Badge>;
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600 rounded-full">Enviado</Badge>;
     case 'delivered':
-      return <Badge className="bg-green-500 hover:bg-green-600">Entregue</Badge>;
+      return <Badge className="bg-green-500 hover:bg-green-600 rounded-full">Entregue</Badge>;
     default:
-      return <Badge variant="outline">{status}</Badge>;
+      return <Badge variant="outline" className="rounded-full">{status}</Badge>;
   }
 };
 
@@ -118,11 +111,11 @@ const Dashboard = () => {
           <Skeleton className="h-6 w-96" />
         </header>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
-          <Skeleton className="h-34 w-full" />
-          <Skeleton className="h-34 w-full" />
-          <Skeleton className="h-34 w-full" />
+          <Skeleton className="h-34 w-full rounded-xl" />
+          <Skeleton className="h-34 w-full rounded-xl" />
+          <Skeleton className="h-34 w-full rounded-xl" />
         </div>
-        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-48 w-full rounded-xl" />
       </div>
     );
   }
@@ -146,14 +139,14 @@ const Dashboard = () => {
       <div className="flex flex-wrap gap-4 mb-8">
         <Link to="/adicionar-produto" className="flex-1 min-w-[150px]">
           <Button className={cn(
-            "w-full py-6 text-lg font-heading",
+            "w-full py-6 text-lg font-heading rounded-xl neon-glow",
             "border border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300"
           )}>
             <PlusCircle className="mr-2 h-5 w-5" /> Adicionar Produto
           </Button>
         </Link>
         <Link to="/configuracoes" className="flex-1 min-w-[150px]">
-          <Button variant="outline" className="w-full py-6 text-lg font-heading">
+          <Button variant="outline" className="w-full py-6 text-lg font-heading rounded-xl">
             <SettingsIcon className="mr-2 h-5 w-5" /> Gerir Loja
           </Button>
         </Link>
@@ -161,18 +154,18 @@ const Dashboard = () => {
 
       {/* Metrics Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-8">
-        <Card className="border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300">
+        <Card className="rounded-xl border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 neon-glow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium font-sans">Saldo Total de Vendas</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-heading">R$ {balance.toFixed(2)}</div>
+            <div className="text-2xl font-bold font-heading">MZN {balance.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground font-sans">Total acumulado de pedidos pagos</p>
           </CardContent>
         </Card>
         
-        <Card className="border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300">
+        <Card className="rounded-xl border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 neon-glow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium font-sans">Produtos Ativos</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
@@ -183,7 +176,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300">
+        <Card className="rounded-xl border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 neon-glow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium font-sans">Pedidos Pendentes</CardTitle>
             <Store className="h-4 w-4 text-muted-foreground" />
@@ -198,7 +191,7 @@ const Dashboard = () => {
       {/* Recent Orders List */}
       <section>
         <h2 className="text-2xl font-heading font-bold mb-4">Pedidos Recentes</h2>
-        <Card>
+        <Card className="rounded-xl">
           <CardContent className="p-0">
             {recentOrders && recentOrders.length > 0 ? (
               <div className="divide-y divide-border">
@@ -214,10 +207,10 @@ const Dashboard = () => {
                     </div>
                     <div className="flex items-center space-x-4">
                       <div className="text-lg font-bold font-heading text-primary">
-                        R$ {order.total_amount.toFixed(2)}
+                        MZN {order.total_amount.toFixed(2)}
                       </div>
                       <Link to={`/pedidos/${order.id}`}>
-                        <Button size="sm" variant="outline" title="Ver Detalhes">
+                        <Button size="sm" variant="outline" title="Ver Detalhes" className="rounded-xl">
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>

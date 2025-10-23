@@ -15,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { deleteProductImage, uploadProductImage } from "@/integrations/supabase/storage"; // Reutilizando funções de storage
+import { deleteProductImage, uploadProductImage } from "@/integrations/supabase/storage";
 import { showSuccess } from "@/utils/toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 
@@ -166,13 +166,13 @@ const Settings = () => {
     return (
       <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-4xl mx-auto">
         <Skeleton className="h-8 w-64 mb-8" />
-        <Card className="p-6 space-y-6 mb-8">
+        <Card className="p-6 space-y-6 mb-8 rounded-xl">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-12 w-full" />
         </Card>
-        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full rounded-xl" />
       </div>
     );
   }
@@ -186,7 +186,7 @@ const Settings = () => {
 
       {/* User Profile Settings */}
       <Card className={cn(
-        "mb-8 border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300"
+        "mb-8 rounded-xl border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 neon-glow"
       )}>
         <CardHeader>
           <CardTitle className="font-heading text-xl flex items-center"><User className="h-5 w-5 mr-2" /> Perfil do Vendedor</CardTitle>
@@ -199,7 +199,7 @@ const Settings = () => {
                 <Input 
                   id="firstName" 
                   placeholder="João" 
-                  className="font-sans" 
+                  className="font-sans rounded-lg" 
                   {...profileForm.register("first_name")}
                 />
                 {profileForm.formState.errors.first_name && (
@@ -211,7 +211,7 @@ const Settings = () => {
                 <Input 
                   id="lastName" 
                   placeholder="Silva" 
-                  className="font-sans" 
+                  className="font-sans rounded-lg" 
                   {...profileForm.register("last_name")}
                 />
                 {profileForm.formState.errors.last_name && (
@@ -221,9 +221,9 @@ const Settings = () => {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email (Não Editável)</Label>
-              <Input id="email" type="email" placeholder={profile?.session?.user.email || "N/A"} className="font-sans" disabled />
+              <Input id="email" type="email" placeholder={profile?.session?.user.email || "N/A"} className="font-sans rounded-lg" disabled />
             </div>
-            <Button type="submit" className="w-full font-heading" disabled={isSavingProfile}>
+            <Button type="submit" className="w-full font-heading rounded-xl neon-glow" disabled={isSavingProfile}>
               {isSavingProfile ? (
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               ) : (
@@ -239,7 +239,7 @@ const Settings = () => {
 
       {/* Store Settings */}
       <Card className={cn(
-        "mb-8 border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300"
+        "mb-8 rounded-xl border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 neon-glow"
       )}>
         <CardHeader>
           <CardTitle className="font-heading text-xl flex items-center"><Store className="h-5 w-5 mr-2" /> Informações da Loja</CardTitle>
@@ -251,7 +251,7 @@ const Settings = () => {
               <Input 
                 id="storeName" 
                 placeholder="Lumi Store Oficial" 
-                className="font-sans" 
+                className="font-sans rounded-lg" 
                 {...storeForm.register("name")}
               />
               {storeForm.formState.errors.name && (
@@ -264,7 +264,7 @@ const Settings = () => {
                 id="storeDescription" 
                 placeholder="Uma breve descrição da sua loja..." 
                 rows={3} 
-                className="font-sans" 
+                className="font-sans rounded-lg" 
                 {...storeForm.register("description")}
               />
             </div>
@@ -279,7 +279,7 @@ const Settings = () => {
                     <img 
                       src={previewLogo} 
                       alt="Logo Preview" 
-                      className="w-full h-full object-contain rounded-lg border border-border p-1"
+                      className="w-full h-full object-contain rounded-xl border border-border p-1"
                     />
                     <Button 
                       type="button" 
@@ -292,7 +292,7 @@ const Settings = () => {
                     </Button>
                   </div>
                 ) : (
-                  <div className="w-24 h-24 shrink-0 bg-muted rounded-lg flex items-center justify-center border border-dashed border-muted-foreground/50">
+                  <div className="w-24 h-24 shrink-0 bg-muted rounded-xl flex items-center justify-center border border-dashed border-muted-foreground/50">
                     <ImageIcon className="h-8 w-8 text-muted-foreground" />
                   </div>
                 )}
@@ -302,14 +302,14 @@ const Settings = () => {
                     id="logo" 
                     type="file" 
                     accept="image/*" 
-                    className="font-sans" 
+                    className="font-sans rounded-lg" 
                     onChange={handleFileChange}
                   />
                 </div>
               </div>
             </div>
 
-            <Button type="submit" className="w-full font-heading" disabled={isSavingStore}>
+            <Button type="submit" className="w-full font-heading rounded-xl neon-glow" disabled={isSavingStore}>
               {isSavingStore ? (
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               ) : (
@@ -324,7 +324,7 @@ const Settings = () => {
       <Separator className="my-8" />
 
       {/* Logout */}
-      <Button onClick={handleLogout} variant="destructive" className="w-full font-heading">
+      <Button onClick={handleLogout} variant="destructive" className="w-full font-heading rounded-xl">
         <LogOut className="mr-2 h-5 w-5" /> Sair da Conta
       </Button>
     </div>

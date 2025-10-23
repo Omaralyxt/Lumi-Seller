@@ -29,8 +29,8 @@ const NavLink = ({ href, icon: Icon, name, isMobile = false, onClick }: NavLinkP
   const location = useLocation();
   const isActive = location.pathname === href;
 
-  const baseClasses = "flex items-center p-3 rounded-lg transition-colors font-sans";
-  const activeClasses = "bg-sidebar-primary text-sidebar-primary-foreground shadow-md font-bold";
+  const baseClasses = "flex items-center p-3 rounded-xl transition-all duration-300 font-sans";
+  const activeClasses = "bg-sidebar-primary text-sidebar-primary-foreground shadow-lg neon-glow font-bold animate-pulse-light";
   const inactiveClasses = "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 
   return (
@@ -79,7 +79,7 @@ const SidebarContent = ({ onLinkClick }: { onLinkClick?: () => void }) => {
       <div className="mt-auto pt-4 border-t border-sidebar-border">
         <Button 
           variant="ghost" 
-          className="w-full justify-start text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive"
+          className="w-full justify-start text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive rounded-xl"
           onClick={handleLogout}
         >
           <LogOut className="h-5 w-5 mr-3" />
@@ -98,11 +98,11 @@ const Sidebar = () => {
     return (
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 bg-background/80 backdrop-blur-sm">
+          <Button variant="ghost" size="icon" className="fixed top-4 left-4 z-50 bg-background/80 backdrop-blur-sm rounded-xl neon-glow">
             <Menu className="h-6 w-6" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-[280px] p-0 bg-sidebar">
+        <SheetContent side="left" className="w-[280px] p-0 bg-sidebar rounded-r-xl">
           <SidebarContent onLinkClick={() => setIsOpen(false)} />
         </SheetContent>
       </Sheet>

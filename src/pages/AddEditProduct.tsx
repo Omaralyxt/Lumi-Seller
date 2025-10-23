@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Save, Trash2, Image as ImageIcon } from "lucide-react";
+import { Upload, Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,33 +17,17 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
-
-// Tipagem do Produto
-interface Product {
-  id: string;
-  store_id: string;
-  name: string;
-  description: string | null;
-  price: number;
-  category: string | null;
-  color: string | null;
-  size: string | null;
-  stock: number;
-  shipping_cost: number | null;
-  image_url: string | null;
-}
+import { Product, ProductVariant } from "@/types/database";
+import { useProductVariants, FormVariant } from "@/hooks/use-product-variants";
+import { Separator } from "@/components/ui/separator";
 
 // Esquema de Validação
 const productSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(3, "O nome é obrigatório."),
   description: z.string().nullable(),
-  price: z.coerce.number().min(0.01, "O preço deve ser maior que zero."),
-  stock: z.coerce.number().int().min(0, "O estoque não pode ser negativo."),
   shipping_cost: z.coerce.number().min(0).nullable(),
   category: z.string().nullable(),
-  color: z.string().nullable(),
-  size: z.string().nullable(),
   image_url: z.string().nullable(),
 });
 
@@ -63,56 +47,69 @@ const AddEditProduct = () => {
   const [productLoading, setProductLoading] = useState(!!productId);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  
+  const [initialVariants, setInitialVariants] = useState<ProductVariant[]>([]);
+  const { variants, addVariant, updateVariant, removeVariant, setVariants } = useProductVariants(initialVariants);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: "",
       description: "",
-      price: 0,
-      stock: 0,
       shipping_cost: 0,
       category: "",
-      color: "",
-      size: "",
       image_url: null,
     },
   });
 
-  // Carregar dados do produto para edição
+  // Carregar dados do produto e variantes para edição
   useEffect(() => {
     if (productId && store && !storeLoading) {
-      const fetchProduct = async () => {
-        const { data, error } = await supabase
+      const fetchProductData = async () => {
+        // 1. Buscar Produto
+        const { data: productData, error: productError } = await supabase
           .from('products')
-          .select('*')
+          .select('*, product_variants(*)') // Busca produto e suas variantes
           .eq('id', productId)
           .eq('store_id', store.id)
           .single();
 
-        if (error) {
+        if (productError) {
           showError("Erro ao carregar produto para edição.");
-          console.error(error);
+          console.error(productError);
           navigate('/produtos', { replace: true });
           return;
         }
 
-        if (data) {
+        if (productData) {
           form.reset({
-            ...data,
-            price: parseFloat(data.price as unknown as string),
-            shipping_cost: data.shipping_cost ? parseFloat(data.shipping_cost as unknown as string) : 0,
+            ...productData,
+            shipping_cost: productData.shipping_cost ? parseFloat(productData.shipping_cost as unknown as string) : 0,
           });
-          setPreviewImage(data.image_url);
+          setPreviewImage(productData.image_url);
+          
+          // 2. Carregar Variantes
+          const loadedVariants = (productData.product_variants || []).map((v: any) => ({
+            ...v,
+            price: parseFloat(v.price as unknown as string),
+          })) as ProductVariant[];
+          
+          setInitialVariants(loadedVariants);
+          setVariants(loadedVariants.map(v => ({ ...v, isNew: false })));
         }
         setProductLoading(false);
       };
-      fetchProduct();
+      fetchProductData();
     } else if (!productId) {
+      // Se for novo produto, garante que haja pelo menos uma variante padrão
+      if (variants.length === 0) {
+        addVariant();
+      }
       setProductLoading(false);
     }
   }, [productId, store, storeLoading, form, navigate]);
 
+  // --- Lógica de Imagem ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setFileToUpload(file);
@@ -134,19 +131,32 @@ const AddEditProduct = () => {
     showSuccess("Imagem removida.");
   };
 
+  // --- Lógica de Submissão ---
   const onSubmit = async (values: ProductFormValues) => {
     if (storeLoading || !store || !profile) {
       showError("Aguarde o carregamento da loja ou faça login.");
       return;
     }
+    
+    if (variants.length === 0) {
+        showError("O produto deve ter pelo menos uma variante.");
+        return;
+    }
+    
+    // Validação de variantes
+    const invalidVariant = variants.find(v => !v.name || v.price <= 0 || v.stock < 0);
+    if (invalidVariant) {
+        showError("Todas as variantes devem ter nome, preço maior que zero e estoque válido.");
+        return;
+    }
 
     setIsSubmitting(true);
     let imageUrl = values.image_url;
+    let newProductId = productId;
 
     try {
-      // 1. Upload da nova imagem, se houver
+      // 1. Upload da nova imagem
       if (fileToUpload) {
-        // Se estiver editando e houver uma imagem antiga, deleta
         if (values.image_url) {
           await deleteProductImage(values.image_url);
         }
@@ -162,36 +172,81 @@ const AddEditProduct = () => {
         store_id: store.id,
         name: values.name,
         description: values.description,
-        price: values.price,
-        stock: values.stock,
         shipping_cost: values.shipping_cost,
         category: values.category,
-        color: values.color,
-        size: values.size,
         image_url: imageUrl,
       };
 
-      let result;
+      // 2. Inserir/Atualizar Produto Principal
+      let productResult;
       if (productId) {
         // Edição
-        result = await supabase
+        productResult = await supabase
           .from('products')
           .update(productData)
           .eq('id', productId)
-          .select()
+          .select('id')
           .single();
+        newProductId = productId;
       } else {
         // Criação
-        result = await supabase
+        productResult = await supabase
           .from('products')
           .insert(productData)
-          .select()
+          .select('id')
           .single();
+        newProductId = productResult.data?.id;
       }
 
-      if (result.error) {
-        throw new Error(result.error.message);
+      if (productResult.error || !newProductId) {
+        throw new Error(productResult.error?.message || "Falha ao obter ID do produto.");
       }
+
+      // 3. Gerenciar Variantes
+      const existingVariantIds = initialVariants.map(v => v.id);
+      const currentVariantIds = variants.map(v => v.id).filter(id => !id.startsWith('temp-')); // Filtra IDs temporários
+
+      // 3a. Deletar variantes removidas
+      const variantsToDelete = existingVariantIds.filter(id => !currentVariantIds.includes(id));
+      if (variantsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('product_variants')
+          .delete()
+          .in('id', variantsToDelete);
+        if (deleteError) console.error("Erro ao deletar variantes antigas:", deleteError);
+      }
+
+      // 3b. Inserir/Atualizar variantes
+      const variantsToInsert = variants.filter(v => v.isNew).map(v => ({
+        product_id: newProductId!,
+        store_id: store.id,
+        name: v.name,
+        price: v.price,
+        stock: v.stock,
+      }));
+
+      const variantsToUpdate = variants.filter(v => !v.isNew).map(v => ({
+        id: v.id,
+        name: v.name,
+        price: v.price,
+        stock: v.stock,
+      }));
+      
+      if (variantsToInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from('product_variants')
+          .insert(variantsToInsert);
+        if (insertError) throw new Error(insertError.message);
+      }
+
+      if (variantsToUpdate.length > 0) {
+        // Usamos upsert para atualizar em lote, mas precisamos garantir que o ID esteja presente
+        const { error: updateError } = await supabase
+          .from('product_variants')
+          .upsert(variantsToUpdate);
+        if (updateError) throw new Error(updateError.message);
+      }
+
 
       showSuccess(`Produto ${productId ? 'atualizado' : 'criado'} com sucesso!`);
       navigate('/produtos');
@@ -211,11 +266,6 @@ const AddEditProduct = () => {
         <Card className="p-6 space-y-6">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-20 w-full" />
-          <div className="grid grid-cols-3 gap-4">
-            <Skeleton className="h-10" />
-            <Skeleton className="h-10" />
-            <Skeleton className="h-10" />
-          </div>
           <Skeleton className="h-12 w-full" />
         </Card>
       </div>
@@ -228,23 +278,23 @@ const AddEditProduct = () => {
         <h1 className="text-3xl font-heading font-bold text-primary mb-2">
           {productId ? "Editar Produto" : "Adicionar Novo Produto"}
         </h1>
-        <p className="text-md text-muted-foreground">Preencha os detalhes do seu produto para sincronizar com o Lumi Market.</p>
+        <p className="text-md text-muted-foreground">Gerencie as variantes e detalhes do seu produto.</p>
       </header>
 
-      <Card className="border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300">
+      <Card className="border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 rounded-xl">
         <CardHeader>
           <CardTitle className="font-heading text-xl">Detalhes do Produto</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             
-            {/* Nome */}
+            {/* Nome e Descrição */}
             <div className="grid gap-2">
               <Label htmlFor="name">Nome do Produto</Label>
               <Input 
                 id="name" 
                 placeholder="Ex: Tênis Esportivo Ultra" 
-                className="font-sans" 
+                className="font-sans rounded-lg" 
                 {...form.register("name")}
               />
               {form.formState.errors.name && (
@@ -252,75 +302,99 @@ const AddEditProduct = () => {
               )}
             </div>
 
-            {/* Descrição */}
             <div className="grid gap-2">
               <Label htmlFor="description">Descrição</Label>
               <Textarea 
                 id="description" 
                 placeholder="Detalhes completos do produto..." 
                 rows={4} 
-                className="font-sans" 
+                className="font-sans rounded-lg" 
                 {...form.register("description")}
               />
             </div>
-
-            {/* Preço, Estoque, Envio */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* Categoria e Envio */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="price">Preço (R$)</Label>
-                <Input 
-                  id="price" 
-                  type="number" 
-                  step="0.01" 
-                  placeholder="99.90" 
-                  className="font-sans" 
-                  {...form.register("price", { valueAsNumber: true })}
-                />
-                {form.formState.errors.price && (
-                  <p className="text-destructive text-sm">{form.formState.errors.price.message}</p>
-                )}
+                <Label htmlFor="category">Categoria</Label>
+                <Input id="category" placeholder="Roupas, Eletrônicos, etc." className="font-sans rounded-lg" {...form.register("category")} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="stock">Estoque</Label>
-                <Input 
-                  id="stock" 
-                  type="number" 
-                  placeholder="100" 
-                  className="font-sans" 
-                  {...form.register("stock", { valueAsNumber: true })}
-                />
-                {form.formState.errors.stock && (
-                  <p className="text-destructive text-sm">{form.formState.errors.stock.message}</p>
-                )}
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="shipping">Custo de Envio (R$)</Label>
+                <Label htmlFor="shipping">Custo de Envio (MZN)</Label>
                 <Input 
                   id="shipping" 
                   type="number" 
                   step="0.01" 
                   placeholder="15.00" 
-                  className="font-sans" 
+                  className="font-sans rounded-lg" 
                   {...form.register("shipping_cost", { valueAsNumber: true })}
                 />
               </div>
             </div>
 
-            {/* Categoria, Cor, Tamanho */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="category">Categoria</Label>
-                <Input id="category" placeholder="Roupas, Eletrônicos, etc." className="font-sans" {...form.register("category")} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="color">Cor</Label>
-                <Input id="color" placeholder="Azul, Preto, Branco" className="font-sans" {...form.register("color")} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="size">Tamanho</Label>
-                <Input id="size" placeholder="P, M, G ou 38, 40" className="font-sans" {...form.register("size")} />
-              </div>
+            <Separator />
+
+            {/* Variantes do Produto */}
+            <div className="space-y-4">
+                <h3 className="text-lg font-heading font-bold flex items-center">
+                    <Package className="h-5 w-5 mr-2" /> Variantes (Preço em MZN)
+                </h3>
+                
+                {variants.map((variant, index) => (
+                    <div key={variant.id} className="flex flex-col sm:flex-row gap-3 p-3 border border-border rounded-lg bg-muted/20">
+                        <div className="flex-1 grid gap-1">
+                            <Label htmlFor={`variant-name-${variant.id}`} className="text-xs text-muted-foreground">Nome da Variante (Ex: P/Azul)</Label>
+                            <Input 
+                                id={`variant-name-${variant.id}`}
+                                placeholder="Ex: Tamanho P, Cor Azul"
+                                value={variant.name}
+                                onChange={(e) => updateVariant(variant.id, { name: e.target.value })}
+                                className="font-sans rounded-lg"
+                            />
+                        </div>
+                        <div className="w-full sm:w-32 grid gap-1">
+                            <Label htmlFor={`variant-price-${variant.id}`} className="text-xs text-muted-foreground">Preço (MZN)</Label>
+                            <Input 
+                                id={`variant-price-${variant.id}`}
+                                type="number"
+                                step="0.01"
+                                placeholder="100.00"
+                                value={variant.price}
+                                onChange={(e) => updateVariant(variant.id, { price: parseFloat(e.target.value) || 0 })}
+                                className="font-sans rounded-lg"
+                            />
+                        </div>
+                        <div className="w-full sm:w-24 grid gap-1">
+                            <Label htmlFor={`variant-stock-${variant.id}`} className="text-xs text-muted-foreground">Estoque</Label>
+                            <Input 
+                                id={`variant-stock-${variant.id}`}
+                                type="number"
+                                placeholder="10"
+                                value={variant.stock}
+                                onChange={(e) => updateVariant(variant.id, { stock: parseInt(e.target.value) || 0 })}
+                                className="font-sans rounded-lg"
+                            />
+                        </div>
+                        <div className="flex items-end pb-1">
+                            <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => removeVariant(variant.id)}
+                                className="text-destructive hover:bg-destructive/10"
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                ))}
+                
+                <Button type="button" variant="outline" onClick={addVariant} className="w-full font-heading rounded-lg border-dashed">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Variante
+                </Button>
             </div>
+
+            <Separator />
 
             {/* Imagem do Produto */}
             <div className="grid gap-2">
@@ -332,7 +406,7 @@ const AddEditProduct = () => {
                     <img 
                       src={previewImage} 
                       alt="Preview" 
-                      className="w-full h-full object-cover rounded-lg border border-border"
+                      className="w-full h-full object-cover rounded-xl border border-border"
                     />
                     <Button 
                       type="button" 
@@ -345,7 +419,7 @@ const AddEditProduct = () => {
                     </Button>
                   </div>
                 ) : (
-                  <div className="w-24 h-24 shrink-0 bg-muted rounded-lg flex items-center justify-center border border-dashed border-muted-foreground/50">
+                  <div className="w-24 h-24 shrink-0 bg-muted rounded-xl flex items-center justify-center border border-dashed border-muted-foreground/50">
                     <ImageIcon className="h-8 w-8 text-muted-foreground" />
                   </div>
                 )}
@@ -355,7 +429,7 @@ const AddEditProduct = () => {
                     id="image" 
                     type="file" 
                     accept="image/*" 
-                    className="font-sans" 
+                    className="font-sans rounded-lg" 
                     onChange={handleFileChange}
                   />
                 </div>
@@ -365,13 +439,13 @@ const AddEditProduct = () => {
             <Button 
               type="submit" 
               className={cn(
-                "w-full py-6 text-lg font-heading",
+                "w-full py-6 text-lg font-heading rounded-xl",
                 "border border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300"
               )}
               disabled={isSubmitting}
             >
               <Save className="mr-2 h-5 w-5" /> 
-              {isSubmitting ? "Salvando..." : productId ? "Atualizar Produto" : "Salvar Produto"}
+              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : productId ? "Atualizar Produto" : "Salvar Produto"}
             </Button>
           </form>
         </CardContent>

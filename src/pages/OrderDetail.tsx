@@ -10,36 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useParams, useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { usePageTitle } from "@/hooks/use-page-title";
-
-// Tipagem do Pedido (detalhada)
-interface Order {
-  id: string;
-  store_id: string;
-  customer_id: string | null;
-  total_amount: number;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered';
-  created_at: string;
-}
-
-// Tipagem do Item do Pedido
-interface OrderItem {
-  id: string;
-  product_name: string;
-  quantity: number;
-  price_at_purchase: number;
-}
-
-// Tipagem do Cliente
-interface Customer {
-  id: string;
-  full_name: string;
-  email: string;
-  phone: string | null;
-  shipping_address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-}
+import { Order, OrderItem, Customer } from "@/types/database"; // Usando tipagem centralizada
+import { cn } from "@/lib/utils";
 
 const OrderDetail = () => {
   const { id: orderId } = useParams<{ id: string }>();
@@ -161,15 +133,15 @@ const OrderDetail = () => {
   const getStatusBadge = (status: Order['status']) => {
     switch (status) {
       case 'paid':
-        return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600">Pago</Badge>;
+        return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 rounded-full">Pago</Badge>;
       case 'pending':
-        return <Badge variant="secondary">Pendente</Badge>;
+        return <Badge variant="secondary" className="rounded-full">Pendente</Badge>;
       case 'shipped':
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600">Enviado</Badge>;
+        return <Badge className="bg-yellow-500 hover:bg-yellow-600 rounded-full">Enviado</Badge>;
       case 'delivered':
-        return <Badge className="bg-green-500 hover:bg-green-600">Entregue</Badge>;
+        return <Badge className="bg-green-500 hover:bg-green-600 rounded-full">Entregue</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline" className="rounded-full">{status}</Badge>;
     }
   };
 
@@ -178,10 +150,10 @@ const OrderDetail = () => {
       <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-4xl mx-auto">
         <Skeleton className="h-8 w-48 mb-8" />
         <div className="grid gap-6 md:grid-cols-2">
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
         </div>
-        <Skeleton className="h-64 w-full mt-6" />
+        <Skeleton className="h-64 w-full mt-6 rounded-xl" />
       </div>
     );
   }
@@ -210,7 +182,7 @@ const OrderDetail = () => {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-6xl mx-auto">
       <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between">
-        <Button variant="ghost" onClick={() => navigate('/pedidos')} className="mb-4 sm:mb-0">
+        <Button variant="ghost" onClick={() => navigate('/pedidos')} className="mb-4 sm:mb-0 rounded-xl">
           <ArrowLeft className="h-5 w-5 mr-2" /> Voltar aos Pedidos
         </Button>
         <h1 className="text-3xl font-heading font-bold text-primary">Detalhes do Pedido #{order.id.substring(0, 8)}</h1>
@@ -219,23 +191,26 @@ const OrderDetail = () => {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Coluna 1: Status e Resumo */}
         <div className="lg:col-span-1 space-y-6">
-          <Card className="border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300">
+          <Card className={cn(
+            "rounded-xl border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 neon-glow",
+            "animate-pulse-light" // Animação leve no card principal
+          )}>
             <CardHeader>
               <CardTitle className="font-heading text-xl flex items-center"><DollarSign className="h-5 w-5 mr-2" /> Resumo</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Subtotal:</span>
-                <span className="font-medium">R$ {subtotal.toFixed(2)}</span>
+                <span className="font-medium">MZN {subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Frete:</span>
-                <span className="font-medium">R$ {shippingCost.toFixed(2)}</span>
+                <span className="font-medium">MZN {shippingCost.toFixed(2)}</span>
               </div>
               <Separator />
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Total:</span>
-                <span className="text-2xl font-bold text-primary font-heading">R$ {order.total_amount.toFixed(2)}</span>
+                <span className="text-2xl font-bold text-primary font-heading">MZN {order.total_amount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Status:</span>
@@ -249,14 +224,14 @@ const OrderDetail = () => {
           </Card>
 
           {/* Ações de Status */}
-          <Card>
+          <Card className="rounded-xl">
             <CardHeader>
               <CardTitle className="font-heading text-xl flex items-center"><Truck className="h-5 w-5 mr-2" /> Ações</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {order.status === 'paid' && (
                 <Button 
-                  className="w-full font-heading bg-blue-500 hover:bg-blue-600"
+                  className="w-full font-heading bg-blue-500 hover:bg-blue-600 rounded-xl neon-glow"
                   onClick={() => handleUpdateStatus('shipped')}
                   disabled={isUpdating}
                 >
@@ -265,7 +240,7 @@ const OrderDetail = () => {
               )}
               {order.status === 'shipped' && (
                 <Button 
-                  className="w-full font-heading bg-green-500 hover:bg-green-600"
+                  className="w-full font-heading bg-green-500 hover:bg-green-600 rounded-xl neon-glow"
                   onClick={() => handleUpdateStatus('delivered')}
                   disabled={isUpdating}
                 >
@@ -281,7 +256,7 @@ const OrderDetail = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="rounded-xl">
             <CardHeader>
               <CardTitle className="font-heading text-xl flex items-center"><User className="h-5 w-5 mr-2" /> Cliente</CardTitle>
             </CardHeader>
@@ -297,7 +272,7 @@ const OrderDetail = () => {
 
         {/* Coluna 2 & 3: Itens e Envio */}
         <div className="lg:col-span-2 space-y-6">
-          <Card>
+          <Card className="rounded-xl">
             <CardHeader>
               <CardTitle className="font-heading text-xl flex items-center"><Package className="h-5 w-5 mr-2" /> Itens do Pedido ({items?.length || 0})</CardTitle>
             </CardHeader>
@@ -305,12 +280,12 @@ const OrderDetail = () => {
               {items && items.length > 0 ? (
                 <ul className="space-y-4">
                   {items.map((item) => (
-                    <li key={item.id} className="flex justify-between items-center border-b border-border/50 pb-2 last:border-b-0 last:pb-0">
+                    <li key={item.id} className="flex justify-between items-center border-b border-border/50 pb-2 last:border-b-0 last:pb-0 hover:bg-muted/20 p-2 rounded-lg transition-colors">
                       <div className="flex flex-col">
                         <span className="font-medium">{item.product_name}</span>
                         <span className="text-sm text-muted-foreground">Qtd: {item.quantity}</span>
                       </div>
-                      <span className="font-bold text-primary">R$ {(item.price_at_purchase * item.quantity).toFixed(2)}</span>
+                      <span className="font-bold text-primary">MZN {(item.price_at_purchase * item.quantity).toFixed(2)}</span>
                     </li>
                   ))}
                 </ul>
@@ -320,7 +295,7 @@ const OrderDetail = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="rounded-xl">
             <CardHeader>
               <CardTitle className="font-heading text-xl flex items-center"><MapPin className="h-5 w-5 mr-2" /> Endereço de Envio</CardTitle>
             </CardHeader>

@@ -66,11 +66,17 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Adicionando cor Neon Azul
+        neon: {
+          DEFAULT: "217 91.2% 59.8%", // Cor primária azul
+          glow: "0 0 10px hsl(var(--neon))",
+        }
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        // Aumentando o raio para um visual mais iOS
+        lg: "1rem", // 16px
+        md: "0.75rem", // 12px
+        sm: "0.5rem", // 8px
       },
       keyframes: {
         "accordion-down": {
@@ -89,10 +95,16 @@ export default {
             height: "0",
           },
         },
+        // Animação de pulso leve para o neon
+        'pulse-light': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.9' },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-light": "pulse-light 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
       },
     },
   },

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import Products from "./pages/Products"; // Renamed from Index
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -12,11 +12,12 @@ import Orders from "./pages/Orders";
 import Settings from "./pages/Settings";
 import { useAuth } from "@/hooks/use-auth";
 import { MadeWithDyad } from "@/components/made-with-dyad";
+import Layout from "./components/Layout"; // Importando o novo Layout
 
 const queryClient = new QueryClient();
 
-// Component to protect routes
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+// Componente para proteger rotas e aplicar o layout
+const ProtectedLayout = () => {
   const { session, loading } = useAuth();
 
   if (loading) {
@@ -32,7 +33,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return (
+    <Layout>
+      <Outlet />
+    </Layout>
+  );
 };
 
 const App = () => {
@@ -46,13 +51,15 @@ const App = () => {
             {/* Public Route */}
             <Route path="/login" element={<Login />} />
 
-            {/* Protected Routes */}
-            <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/adicionar-produto" element={<ProtectedRoute><AddEditProduct /></ProtectedRoute>} />
-            <Route path="/produtos" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-            <Route path="/pedidos" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-            <Route path="/configuracoes" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            {/* Protected Routes Grouped under ProtectedLayout */}
+            <Route element={<ProtectedLayout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/adicionar-produto" element={<AddEditProduct />} />
+              <Route path="/produtos" element={<Products />} />
+              <Route path="/pedidos" element={<Orders />} />
+              <Route path="/configuracoes" element={<Settings />} />
+            </Route>
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Truck, CheckCircle, Loader2, Eye } from "lucide-react";
+import { Truck, CheckCircle, Loader2, Eye, ShoppingCart } from "lucide-react";
 import { useStore } from "@/hooks/use-store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
 import { usePageTitle } from "@/hooks/use-page-title";
+import EmptyState from "@/components/EmptyState";
 
 // Tipagem do Pedido
 interface Order {
@@ -133,65 +134,68 @@ const Orders = () => {
           <CardTitle className="font-heading text-xl">Pedidos Recentes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="font-heading">ID</TableHead>
-                  <TableHead className="font-heading">Total</TableHead>
-                  <TableHead className="font-heading">Data</TableHead>
-                  <TableHead className="font-heading">Status</TableHead>
-                  <TableHead className="font-heading text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {orders && orders.length > 0 ? (
-                  orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium truncate max-w-[150px]">{order.id.substring(0, 8)}...</TableCell>
-                      <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
-                      <TableCell>{new Date(order.created_at).toLocaleDateString('pt-BR')}</TableCell>
-                      <TableCell>{getStatusBadge(order.status)}</TableCell>
-                      <TableCell className="text-right space-x-2 flex justify-end items-center">
-                        <Link to={`/pedidos/${order.id}`}>
-                            <Button size="sm" variant="outline" title="Ver Detalhes">
-                                <Eye className="h-4 w-4" />
-                            </Button>
-                        </Link>
-                        
-                        {order.status === 'paid' && (
-                          <Button 
-                            size="sm" 
-                            variant="secondary" 
-                            onClick={() => handleUpdateStatus(order.id, 'paid')}
-                            disabled={updateStatusMutation.isPending}
-                          >
-                            {updateStatusMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4 mr-1" />} Enviar
-                          </Button>
-                        )}
-                        {order.status === 'shipped' && (
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleUpdateStatus(order.id, 'shipped')}
-                            disabled={updateStatusMutation.isPending}
-                          >
-                            {updateStatusMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />} Entregue
-                          </Button>
-                        )}
-                        {/* Se o status for pending ou delivered, não há ação de atualização aqui */}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
+          {orders && orders.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      Nenhum pedido encontrado para sua loja.
-                    </TableCell>
+                    <TableHead className="font-heading">ID</TableHead>
+                    <TableHead className="font-heading">Total</TableHead>
+                    <TableHead className="font-heading">Data</TableHead>
+                    <TableHead className="font-heading">Status</TableHead>
+                    <TableHead className="font-heading text-right">Ações</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {orders.map((order) => (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-medium truncate max-w-[150px]">{order.id.substring(0, 8)}...</TableCell>
+                        <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
+                        <TableCell>{new Date(order.created_at).toLocaleDateString('pt-BR')}</TableCell>
+                        <TableCell>{getStatusBadge(order.status)}</TableCell>
+                        <TableCell className="text-right space-x-2 flex justify-end items-center">
+                          <Link to={`/pedidos/${order.id}`}>
+                              <Button size="sm" variant="outline" title="Ver Detalhes">
+                                  <Eye className="h-4 w-4" />
+                              </Button>
+                          </Link>
+                          
+                          {order.status === 'paid' && (
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              onClick={() => handleUpdateStatus(order.id, 'paid')}
+                              disabled={updateStatusMutation.isPending}
+                            >
+                              {updateStatusMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4 mr-1" />} Enviar
+                            </Button>
+                          )}
+                          {order.status === 'shipped' && (
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleUpdateStatus(order.id, 'shipped')}
+                              disabled={updateStatusMutation.isPending}
+                            >
+                              {updateStatusMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />} Entregue
+                            </Button>
+                          )}
+                          {/* Se o status for pending ou delivered, não há ação de atualização aqui */}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <EmptyState
+                icon={ShoppingCart}
+                title="Nenhum Pedido Encontrado"
+                description="Sua loja ainda não recebeu pedidos. Continue adicionando produtos para começar a vender!"
+                // Não há ação direta para criar um pedido, então omitimos actionText/actionLink
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

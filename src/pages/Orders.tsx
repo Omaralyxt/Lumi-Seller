@@ -2,12 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Truck, CheckCircle, Loader2 } from "lucide-react";
+import { Truck, CheckCircle, Loader2, Eye } from "lucide-react";
 import { useStore } from "@/hooks/use-store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Link } from "react-router-dom";
 
 // Tipagem do Pedido
 interface Order {
@@ -145,11 +146,17 @@ const Orders = () => {
                 {orders && orders.length > 0 ? (
                   orders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-medium truncate max-w-[150px]">{order.id}</TableCell>
+                      <TableCell className="font-medium truncate max-w-[150px]">{order.id.substring(0, 8)}...</TableCell>
                       <TableCell>R$ {order.total_amount.toFixed(2)}</TableCell>
                       <TableCell>{new Date(order.created_at).toLocaleDateString('pt-BR')}</TableCell>
                       <TableCell>{getStatusBadge(order.status)}</TableCell>
-                      <TableCell className="text-right space-x-2">
+                      <TableCell className="text-right space-x-2 flex justify-end items-center">
+                        <Link to={`/pedidos/${order.id}`}>
+                            <Button size="sm" variant="outline" title="Ver Detalhes">
+                                <Eye className="h-4 w-4" />
+                            </Button>
+                        </Link>
+                        
                         {order.status === 'paid' && (
                           <Button 
                             size="sm" 

@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import AddEditProduct from "./pages/AddEditProduct";
 import Orders from "./pages/Orders";
 import Settings from "./pages/Settings";
+import OrderDetail from "./pages/OrderDetail"; // Importando OrderDetail
 import { useAuth } from "@/hooks/use-auth";
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import Layout from "./components/Layout"; // Importando o novo Layout
@@ -58,6 +59,7 @@ const App = () => {
               <Route path="/adicionar-produto" element={<AddEditProduct />} />
               <Route path="/produtos" element={<Products />} />
               <Route path="/pedidos" element={<Orders />} />
+              <Route path="/pedidos/:id" element={<OrderDetail />} /> {/* Nova Rota */}
               <Route path="/configuracoes" element={<Settings />} />
             </Route>
             

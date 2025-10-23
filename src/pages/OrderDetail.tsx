@@ -20,6 +20,14 @@ interface Order {
   created_at: string;
 }
 
+// Tipagem do Item do Pedido
+interface OrderItem {
+  id: string;
+  product_name: string;
+  quantity: number;
+  price_at_purchase: number;
+}
+
 const OrderDetail = () => {
   const { id: orderId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -37,24 +45,48 @@ const OrderDetail = () => {
       .single();
 
     if (error) {
-      // Se o erro for apenas "no rows found", tratamos como não encontrado
       if (error.code === 'PGRST116') {
         return null;
       }
       throw new Error(error.message);
     }
     
-    // Converte total_amount de string para number
     return {
       ...data,
       total_amount: parseFloat(data.total_amount as unknown as string),
     } as Order;
   };
 
-  const { data: order, isLoading, error } = useQuery({
+  // Função de busca dos itens do pedido
+  const fetchOrderItems = async (): Promise<OrderItem[]> => {
+    if (!store || !orderId) return [];
+
+    const { data, error } = await supabase
+      .from('order_items')
+      .select('id, product_name, quantity, price_at_purchase')
+      .eq('order_id', orderId)
+      .eq('store_id', store.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data.map(item => ({
+      ...item,
+      price_at_purchase: parseFloat(item.price_at_purchase as unknown as string),
+    })) as OrderItem[];
+  };
+
+  const { data: order, isLoading: isOrderLoading, error: orderError } = useQuery({
     queryKey: ['order', orderId, store?.id],
     queryFn: fetchOrder,
     enabled: !!store && !!orderId && !storeLoading,
+  });
+
+  const { data: items, isLoading: isItemsLoading, error: itemsError } = useQuery({
+    queryKey: ['orderItems', orderId, store?.id],
+    queryFn: fetchOrderItems,
+    enabled: !!order && !isOrderLoading,
   });
 
   const getStatusBadge = (status: Order['status']) => {
@@ -72,7 +104,7 @@ const OrderDetail = () => {
     }
   };
 
-  if (storeLoading || isLoading) {
+  if (storeLoading || isOrderLoading || isItemsLoading) {
     return (
       <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-4xl mx-auto">
         <Skeleton className="h-8 w-48 mb-8" />
@@ -85,14 +117,20 @@ const OrderDetail = () => {
     );
   }
 
-  if (error) {
-    showError(`Erro ao carregar detalhes do pedido: ${error.message}`);
+  if (orderError || itemsError) {
+    showError(`Erro ao carregar detalhes do pedido: ${orderError?.message || itemsError?.message}`);
     return <div className="p-8 text-center text-destructive">Erro ao carregar pedido.</div>;
   }
 
   if (!order) {
     return <div className="p-8 text-center text-muted-foreground">Pedido não encontrado ou você não tem permissão para visualizá-lo.</div>;
   }
+
+  const subtotal = items?.reduce((sum, item) => sum + (item.price_at_purchase * item.quantity), 0) || 0;
+  // Assumindo que o total_amount inclui o custo de envio, mas como não temos essa informação no item, 
+  // vamos calcular a diferença como um placeholder para o frete.
+  const shippingCost = order.total_amount - subtotal;
+
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-6xl mx-auto">
@@ -111,15 +149,24 @@ const OrderDetail = () => {
               <CardTitle className="font-heading text-xl flex items-center"><DollarSign className="h-5 w-5 mr-2" /> Resumo</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Subtotal:</span>
+                <span className="font-medium">R$ {subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Frete:</span>
+                <span className="font-medium">R$ {shippingCost.toFixed(2)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Total:</span>
+                <span className="text-2xl font-bold text-primary font-heading">R$ {order.total_amount.toFixed(2)}</span>
+              </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Status:</span>
                 {getStatusBadge(order.status)}
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Total:</span>
-                <span className="text-xl font-bold text-primary">R$ {order.total_amount.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
+              <div className="flex justify-between items-center text-sm pt-2">
                 <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                 <span className="text-muted-foreground">{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
               </div>
@@ -145,23 +192,24 @@ const OrderDetail = () => {
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="font-heading text-xl flex items-center"><Package className="h-5 w-5 mr-2" /> Itens do Pedido</CardTitle>
+              <CardTitle className="font-heading text-xl flex items-center"><Package className="h-5 w-5 mr-2" /> Itens do Pedido ({items?.length || 0})</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">
-                Detalhes dos itens comprados (requer tabela `order_items`).
-              </p>
-              <ul className="mt-4 space-y-2">
-                {/* Placeholder de Itens */}
-                <li className="flex justify-between border-b pb-2">
-                    <span>Produto A (x1)</span>
-                    <span>R$ 50.00</span>
-                </li>
-                <li className="flex justify-between border-b pb-2">
-                    <span>Produto B (x2)</span>
-                    <span>R$ 100.00</span>
-                </li>
-              </ul>
+              {items && items.length > 0 ? (
+                <ul className="space-y-4">
+                  {items.map((item) => (
+                    <li key={item.id} className="flex justify-between items-center border-b border-border/50 pb-2 last:border-b-0 last:pb-0">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{item.product_name}</span>
+                        <span className="text-sm text-muted-foreground">Qtd: {item.quantity}</span>
+                      </div>
+                      <span className="font-bold text-primary">R$ {(item.price_at_purchase * item.quantity).toFixed(2)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-muted-foreground">Nenhum item encontrado para este pedido.</p>
+              )}
             </CardContent>
           </Card>
 

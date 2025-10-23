@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2 } from "lucide-react";
+import { Upload, Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";

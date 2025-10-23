@@ -1,3 +1,13 @@
+// Tipagem para ProductImage
+export interface ProductImage {
+  id: string;
+  product_id: string;
+  store_id: string;
+  image_url: string;
+  sort_order: number;
+  created_at: string;
+}
+
 // Tipagem base para Product
 export interface Product {
   id: string;
@@ -6,7 +16,7 @@ export interface Product {
   description: string | null;
   category: string; // Alterado de string | null para string
   shipping_cost: number | null;
-  image_url: string | null;
+  // image_url: string | null; // Removido, agora está em ProductImage
   created_at: string;
 }
 

@@ -15,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { deleteProductImage, uploadProductImage } from "@/integrations/supabase/storage";
+import { deleteProductLogo, uploadProductLogo } from "@/integrations/supabase/storage"; // Importações atualizadas
 import { showSuccess, showError } from "@/utils/toast";
 import { usePageTitle } from "@/hooks/use-page-title";
 
@@ -40,7 +40,7 @@ const Settings = () => {
   usePageTitle("Configurações");
   const navigate = useNavigate();
   const { store, loading: storeLoading, updateStore } = useStore();
-  const { profile, loading: authLoading, updateProfile, session } = useAuth(); // Adicionado 'session'
+  const { profile, loading: authLoading, updateProfile, session } = useAuth(); 
   
   const [isSavingStore, setIsSavingStore] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -106,7 +106,7 @@ const Settings = () => {
   const handleRemoveLogo = async () => {
     const currentUrl = storeForm.getValues('logo_url');
     if (currentUrl) {
-      const deleted = await deleteProductImage(currentUrl); 
+      const deleted = await deleteProductLogo(currentUrl); // Usando deleteProductLogo
       if (!deleted) {
         showError("Falha ao remover logo do storage.");
         return;
@@ -129,10 +129,10 @@ const Settings = () => {
       if (fileToUpload) {
         // Se já existia uma URL, deletamos a antiga ANTES de fazer o upload da nova
         if (values.logo_url) {
-          await deleteProductImage(values.logo_url);
+          await deleteProductLogo(values.logo_url); // Usando deleteProductLogo
         }
         
-        const uploadedUrl = await uploadProductImage(fileToUpload, profile.id);
+        const uploadedUrl = await uploadProductLogo(fileToUpload, profile.id); // Usando uploadProductLogo
         if (!uploadedUrl) {
           throw new Error("Falha ao fazer upload do logotipo.");
         }

@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package } from "lucide-react";
+import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,14 +14,26 @@ import { supabase } from "@/integrations/supabase/client";
 import { uploadProductImage, deleteProductImage } from "@/integrations/supabase/storage";
 import { showError, showSuccess } from "@/utils/toast";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Product, ProductVariant } from "@/types/database";
+import { Product, ProductVariant, ProductImage } from "@/types/database";
 import { useProductVariants, FormVariant } from "@/hooks/use-product-variants";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRODUCT_CATEGORIES } from "@/lib/categories";
+
+// Tipagem para imagens no formulário
+interface FormImage {
+  id?: string; // ID do banco de dados se for uma imagem existente
+  url: string; // URL pública ou URL temporária (Blob)
+  file: File | null; // Arquivo a ser enviado (se for novo)
+  isNew: boolean; // Se é um novo upload
+  isDeleted: boolean; // Se deve ser deletada do DB
+  sort_order: number;
+}
+
+const MAX_IMAGES = 6;
 
 // Esquema de Validação
 const productSchema = z.object({
@@ -29,8 +41,7 @@ const productSchema = z.object({
   name: z.string().min(3, "O nome é obrigatório."),
   description: z.string().nullable(),
   shipping_cost: z.coerce.number().min(0).nullable(),
-  category: z.string().min(1, "A categoria é obrigatória."), // Tornando obrigatório
-  image_url: z.string().nullable(),
+  category: z.string().min(1, "A categoria é obrigatória."),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -47,8 +58,9 @@ const AddEditProduct = () => {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [productLoading, setProductLoading] = useState(!!productId);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  
+  // Estado para Imagens
+  const [images, setImages] = useState<FormImage[]>([]);
   
   const [initialVariants, setInitialVariants] = useState<ProductVariant[]>([]);
   const { variants, addVariant, updateVariant, removeVariant, setVariants } = useProductVariants(initialVariants);
@@ -59,8 +71,7 @@ const AddEditProduct = () => {
       name: "",
       description: "",
       shipping_cost: 0,
-      category: "", // Valor inicial vazio para forçar a seleção
-      image_url: null,
+      category: "",
     },
   });
 
@@ -68,10 +79,14 @@ const AddEditProduct = () => {
   useEffect(() => {
     if (productId && store && !storeLoading) {
       const fetchProductData = async () => {
-        // 1. Buscar Produto
+        // 1. Buscar Produto, Variantes e Imagens
         const { data: productData, error: productError } = await supabase
           .from('products')
-          .select('*, product_variants(*)') // Busca produto e suas variantes
+          .select(`
+            *, 
+            product_variants(*),
+            product_images(*)
+          `)
           .eq('id', productId)
           .eq('store_id', store.id)
           .single();
@@ -87,11 +102,23 @@ const AddEditProduct = () => {
           form.reset({
             ...productData,
             shipping_cost: productData.shipping_cost ? parseFloat(productData.shipping_cost as unknown as string) : 0,
-            category: productData.category || "", // Garante que category seja string
+            category: productData.category || "",
           });
-          setPreviewImage(productData.image_url);
           
-          // 2. Carregar Variantes
+          // 2. Carregar Imagens
+          const loadedImages = (productData.product_images as ProductImage[] || [])
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map(img => ({
+              id: img.id,
+              url: img.image_url,
+              file: null,
+              isNew: false,
+              isDeleted: false,
+              sort_order: img.sort_order,
+            }));
+          setImages(loadedImages);
+
+          // 3. Carregar Variantes
           const loadedVariants = (productData.product_variants || []).map((v: any) => ({
             ...v,
             price: parseFloat(v.price as unknown as string),
@@ -112,33 +139,54 @@ const AddEditProduct = () => {
     }
   }, [productId, store, storeLoading, form, navigate]);
 
-  // --- Lógica de Imagem ---
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setFileToUpload(file);
-    if (file) {
-      setPreviewImage(URL.createObjectURL(file));
-    } else {
-      setPreviewImage(form.getValues('image_url'));
+  // --- Lógica de Imagens ---
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    if (images.filter(img => !img.isDeleted).length + files.length > MAX_IMAGES) {
+      showError(`Você pode adicionar no máximo ${MAX_IMAGES} imagens.`);
+      return;
     }
+
+    const newImages: FormImage[] = files.map((file, index) => ({
+      url: URL.createObjectURL(file),
+      file: file,
+      isNew: true,
+      isDeleted: false,
+      sort_order: images.length + index,
+    }));
+
+    setImages(prev => [...prev, ...newImages]);
+    e.target.value = ''; // Limpa o input file
   };
 
-  const handleRemoveImage = async () => {
-    const currentUrl = form.getValues('image_url');
-    if (currentUrl) {
-      await deleteProductImage(currentUrl);
-    }
-    setFileToUpload(null);
-    setPreviewImage(null);
-    form.setValue('image_url', null);
-    showSuccess("Imagem removida.");
-  };
+  const handleRemoveImage = useCallback((indexToRemove: number) => {
+    setImages(prev => 
+      prev.map((img, index) => {
+        if (index === indexToRemove) {
+          // Se a imagem já existe no DB, marca para deleção
+          if (img.id) {
+            return { ...img, isDeleted: true };
+          }
+          // Se for uma imagem nova (apenas preview), remove imediatamente
+          return { ...img, isDeleted: true, url: '' }; 
+        }
+        return img;
+      }).filter(img => img.url !== '' || !img.isDeleted) // Remove previews de novas imagens
+    );
+  }, []);
 
   // --- Lógica de Submissão ---
   const onSubmit = async (values: ProductFormValues) => {
     if (storeLoading || !store || !profile) {
       showError("Aguarde o carregamento da loja ou faça login.");
       return;
+    }
+    
+    const activeImages = images.filter(img => !img.isDeleted);
+    if (activeImages.length === 0) {
+        showError("O produto deve ter pelo menos uma imagem.");
+        return;
     }
     
     if (variants.length === 0) {
@@ -154,35 +202,19 @@ const AddEditProduct = () => {
     }
 
     setIsSubmitting(true);
-    let imageUrl = values.image_url;
     let newProductId = productId;
 
     try {
-      // 1. Upload da nova imagem (Se houver, esta é a parte mais lenta)
-      if (fileToUpload) {
-        if (values.image_url) {
-          // Deletar a imagem antiga em paralelo com o upload da nova, se possível,
-          // mas para evitar race conditions, mantemos sequencialmente.
-          await deleteProductImage(values.image_url);
-        }
-        
-        const uploadedUrl = await uploadProductImage(fileToUpload, profile.id);
-        if (!uploadedUrl) {
-          throw new Error("Falha ao fazer upload da imagem.");
-        }
-        imageUrl = uploadedUrl;
-      }
-
+      // 1. Inserir/Atualizar Produto Principal (sem image_url)
       const productData = {
         store_id: store.id,
         name: values.name,
         description: values.description,
         shipping_cost: values.shipping_cost,
         category: values.category,
-        image_url: imageUrl,
+        // image_url removido
       };
 
-      // 2. Inserir/Atualizar Produto Principal
       let productResult;
       if (productId) {
         // Edição
@@ -207,7 +239,60 @@ const AddEditProduct = () => {
         throw new Error(productResult.error?.message || "Falha ao obter ID do produto.");
       }
 
-      // 3. Gerenciar Variantes
+      // 2. Gerenciar Imagens
+      
+      // 2a. Deletar imagens marcadas para exclusão (do Storage e do DB)
+      const imagesToDelete = images.filter(img => img.isDeleted && img.id);
+      const deletePromises = imagesToDelete.map(async (img) => {
+        // Deleta do Storage
+        await deleteProductImage(img.url);
+        // Deleta do DB (ON DELETE CASCADE garante que o registro seja removido)
+        const { error } = await supabase.from('product_images').delete().eq('id', img.id);
+        if (error) console.error("Erro ao deletar registro de imagem:", error);
+      });
+      await Promise.all(deletePromises);
+
+      // 2b. Upload de novas imagens (em paralelo)
+      const newImagesToUpload = activeImages.filter(img => img.isNew && img.file);
+      const uploadPromises = newImagesToUpload.map(img => uploadProductImage(img.file!, profile.id));
+      const uploadedUrls = await Promise.all(uploadPromises);
+      
+      if (uploadedUrls.some(url => !url)) {
+        throw new Error("Falha em um ou mais uploads de imagem.");
+      }
+
+      // 2c. Preparar dados para inserção/atualização no DB
+      const existingImagesToUpdate = activeImages.filter(img => !img.isNew);
+      
+      // Mapeia as URLs recém-carregadas para os objetos de imagem a serem inseridos
+      const imagesToInsertDB = uploadedUrls.filter((url): url is string => !!url).map((url, index) => ({
+        product_id: newProductId!,
+        store_id: store.id,
+        image_url: url,
+        sort_order: existingImagesToUpdate.length + index, // Define a ordem após as existentes
+      }));
+
+      // Combina imagens existentes (para atualizar a ordem) e novas imagens
+      const allImagesToUpsert = [
+        ...existingImagesToUpdate.map((img, index) => ({
+          id: img.id,
+          product_id: newProductId!,
+          store_id: store.id,
+          image_url: img.url,
+          sort_order: index, // Reordena as imagens ativas
+        })),
+        ...imagesToInsertDB,
+      ];
+
+      if (allImagesToUpsert.length > 0) {
+        const { error: upsertImagesError } = await supabase
+          .from('product_images')
+          .upsert(allImagesToUpsert);
+        
+        if (upsertImagesError) throw new Error(`Erro ao salvar imagens: ${upsertImagesError.message}`);
+      }
+
+      // 3. Gerenciar Variantes (Lógica de otimização mantida)
       const existingVariantIds = initialVariants.map(v => v.id);
       const currentVariantIds = variants.map(v => v.id).filter(id => !id.startsWith('temp-'));
 
@@ -232,17 +317,13 @@ const AddEditProduct = () => {
 
       const variantsToUpdate = variants.filter(v => !v.isNew).map(v => ({
         id: v.id,
-        product_id: newProductId!, // Incluir product_id para upsert
+        product_id: newProductId!,
         store_id: store.id,
         name: v.name,
         price: v.price,
         stock: v.stock,
       }));
       
-      // Combinar inserções e atualizações em uma única operação de upsert para otimizar
-      // Nota: O Supabase upsert funciona bem para inserção e atualização, mas requer que o ID esteja presente para atualização.
-      // Como as novas variantes têm IDs temporários (que não são enviados), vamos manter a separação, mas garantir que as atualizações usem upsert.
-
       const insertPromise = variantsToInsert.length > 0 
         ? supabase.from('product_variants').insert(variantsToInsert)
         : Promise.resolve({ error: null });
@@ -280,6 +361,9 @@ const AddEditProduct = () => {
       </div>
     );
   }
+
+  const activeImagesCount = images.filter(img => !img.isDeleted).length;
+  const canAddMoreImages = activeImagesCount < MAX_IMAGES;
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-4xl mx-auto">
@@ -365,6 +449,54 @@ const AddEditProduct = () => {
 
             <Separator />
 
+            {/* Imagens do Produto */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-heading font-bold flex items-center">
+                <ImageIcon className="h-5 w-5 mr-2" /> Imagens do Produto ({activeImagesCount}/{MAX_IMAGES})
+              </h3>
+              
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
+                {images.filter(img => !img.isDeleted).map((img, index) => (
+                  <div key={img.id || img.url} className="relative aspect-square">
+                    <img 
+                      src={img.url} 
+                      alt={`Produto ${index + 1}`} 
+                      className="w-full h-full object-cover rounded-xl border border-border"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="destructive" 
+                      size="icon" 
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full z-10"
+                      onClick={() => handleRemoveImage(index)}
+                      disabled={isSubmitting}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+
+                {canAddMoreImages && (
+                  <div className="aspect-square flex items-center justify-center border-2 border-dashed border-muted-foreground/50 rounded-xl relative hover:bg-muted/20 transition-colors cursor-pointer">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      multiple 
+                      onChange={handleImageUpload}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      disabled={isSubmitting}
+                    />
+                    <PlusCircle className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              {!canAddMoreImages && (
+                <p className="text-sm text-muted-foreground text-center">Limite máximo de {MAX_IMAGES} imagens atingido.</p>
+              )}
+            </div>
+
+            <Separator />
+
             {/* Variantes do Produto */}
             <div className="space-y-4">
                 <h3 className="text-lg font-heading font-bold flex items-center">
@@ -423,48 +555,6 @@ const AddEditProduct = () => {
                 <Button type="button" variant="outline" onClick={addVariant} className="w-full font-heading rounded-lg border-dashed">
                     <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Variante
                 </Button>
-            </div>
-
-            <Separator />
-
-            {/* Imagem do Produto */}
-            <div className="grid gap-2">
-              <Label htmlFor="image">Imagem do Produto</Label>
-              <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                
-                {previewImage ? (
-                  <div className="relative w-24 h-24 shrink-0">
-                    <img 
-                      src={previewImage} 
-                      alt="Preview" 
-                      className="w-full h-full object-cover rounded-xl border border-border"
-                    />
-                    <Button 
-                      type="button" 
-                      variant="destructive" 
-                      size="icon" 
-                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                      onClick={handleRemoveImage}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="w-24 h-24 shrink-0 bg-muted rounded-xl flex items-center justify-center border border-dashed border-muted-foreground/50">
-                    <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                )}
-
-                <div className="flex-1 w-full">
-                  <Input 
-                    id="image" 
-                    type="file" 
-                    accept="image/*" 
-                    className="font-sans rounded-lg" 
-                    onChange={handleFileChange}
-                  />
-                </div>
-              </div>
             </div>
 
             <Button 

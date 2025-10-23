@@ -17,6 +17,7 @@ import { Product } from "@/types/database";
 interface ProductListItem extends Omit<Product, 'shipping_cost' | 'description' | 'category'> {
   min_price: number;
   total_stock: number;
+  image_url: string | null; // Adicionado de volta para a listagem, mas vindo da tabela de imagens
 }
 
 const Products = () => {
@@ -28,14 +29,15 @@ const Products = () => {
   const fetchProducts = async (): Promise<ProductListItem[]> => {
     if (!store) return [];
     
-    // Busca produtos e suas variantes, ordenando as variantes por preço para pegar o mínimo
+    // Busca produtos, variantes e a primeira imagem (ordenada por sort_order)
     const { data, error } = await supabase
       .from('products')
       .select(`
         id, 
         name, 
-        image_url,
-        product_variants (price, stock)
+        created_at,
+        product_variants (price, stock),
+        product_images (image_url, sort_order)
       `)
       .eq('store_id', store.id)
       .order('created_at', { ascending: false });
@@ -46,6 +48,7 @@ const Products = () => {
     
     return data.map(p => {
       const variants = p.product_variants as { price: string, stock: number }[];
+      const images = p.product_images as { image_url: string, sort_order: number }[];
       
       let minPrice = 0;
       let totalStock = 0;
@@ -56,11 +59,14 @@ const Products = () => {
         minPrice = Math.min(...prices);
         totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
       }
+      
+      // Encontra a imagem principal (sort_order 0 ou a primeira)
+      const primaryImage = images.sort((a, b) => a.sort_order - b.sort_order)[0]?.image_url || null;
 
       return {
         id: p.id,
         name: p.name,
-        image_url: p.image_url,
+        image_url: primaryImage,
         min_price: minPrice,
         total_stock: totalStock,
       } as ProductListItem;
@@ -76,12 +82,27 @@ const Products = () => {
   // Mutação para exclusão
   const deleteMutation = useMutation({
     mutationFn: async (product: ProductListItem) => {
-      // 1. Deletar imagem do storage
-      if (product.image_url) {
-        await deleteProductImage(product.image_url);
+      // NOTA: A exclusão do produto principal deve deletar as variantes e as imagens em cascata (ON DELETE CASCADE).
+      // No entanto, precisamos deletar os arquivos do Storage manualmente.
+      
+      // 1. Buscar todas as URLs de imagem associadas a este produto
+      const { data: imagesData, error: fetchImagesError } = await supabase
+        .from('product_images')
+        .select('image_url')
+        .eq('product_id', product.id);
+
+      if (fetchImagesError) {
+        console.error("Erro ao buscar imagens para deleção:", fetchImagesError);
+        // Continuamos, pois o erro pode ser temporário ou as imagens já podem ter sido deletadas.
       }
 
-      // 2. Deletar registro do banco de dados (as variantes serão deletadas em cascata)
+      // 2. Deletar arquivos do storage (em paralelo)
+      if (imagesData && imagesData.length > 0) {
+        const deletePromises = imagesData.map(img => deleteProductImage(img.image_url));
+        await Promise.all(deletePromises);
+      }
+
+      // 3. Deletar registro do banco de dados (deleta produto, variantes e registros de imagens)
       const { error } = await supabase
         .from('products')
         .delete()
@@ -101,7 +122,7 @@ const Products = () => {
   });
 
   const handleDelete = (product: ProductListItem) => {
-    if (window.confirm(`Tem certeza que deseja excluir o produto "${product.name}"? Isso removerá todas as variantes.`)) {
+    if (window.confirm(`Tem certeza que deseja excluir o produto "${product.name}"? Isso removerá todas as variantes e imagens.`)) {
       deleteMutation.mutate(product);
     }
   };

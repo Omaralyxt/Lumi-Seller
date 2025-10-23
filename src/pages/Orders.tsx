@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Truck, CheckCircle, Loader2, Eye, ShoppingCart } from "lucide-react";
+import { Truck, CheckCircle, Loader2, Eye, ShoppingCart, Clipboard } from "lucide-react";
 import { useStore } from "@/hooks/use-store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,10 +73,14 @@ const Orders = () => {
         return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 rounded-full">Pago</Badge>;
       case 'pending':
         return <Badge variant="secondary" className="rounded-full">Pendente</Badge>;
+      case 'processing':
+        return <Badge className="bg-purple-500 hover:bg-purple-600 rounded-full">Processando</Badge>;
       case 'shipped':
         return <Badge className="bg-yellow-500 hover:bg-yellow-600 rounded-full">Enviado</Badge>;
       case 'delivered':
         return <Badge className="bg-green-500 hover:bg-green-600 rounded-full">Entregue</Badge>;
+      case 'canceled':
+        return <Badge variant="destructive" className="rounded-full">Cancelado</Badge>;
       default:
         return <Badge variant="outline" className="rounded-full">{status}</Badge>;
     }
@@ -85,7 +89,9 @@ const Orders = () => {
   const handleUpdateStatus = (orderId: string, currentStatus: Order['status']) => {
     let newStatus: Order['status'] | null = null;
 
-    if (currentStatus === 'paid') {
+    if (currentStatus === 'pending' || currentStatus === 'paid') {
+      newStatus = 'processing';
+    } else if (currentStatus === 'processing') {
       newStatus = 'shipped';
     } else if (currentStatus === 'shipped') {
       newStatus = 'delivered';
@@ -152,11 +158,22 @@ const Orders = () => {
                               </Button>
                           </Link>
                           
-                          {order.status === 'paid' && (
+                          {(order.status === 'pending' || order.status === 'paid') && (
                             <Button 
                               size="sm" 
                               variant="secondary" 
-                              onClick={() => handleUpdateStatus(order.id, 'paid')}
+                              onClick={() => handleUpdateStatus(order.id, order.status)}
+                              disabled={updateStatusMutation.isPending}
+                              className="rounded-xl bg-purple-500 hover:bg-purple-600 text-white"
+                            >
+                              {updateStatusMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clipboard className="h-4 w-4 mr-1" />} Processar
+                            </Button>
+                          )}
+                          {order.status === 'processing' && (
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              onClick={() => handleUpdateStatus(order.id, 'processing')}
                               disabled={updateStatusMutation.isPending}
                               className="rounded-xl"
                             >
@@ -173,7 +190,7 @@ const Orders = () => {
                               {updateStatusMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-1" />} Entregue
                             </Button>
                           )}
-                          {/* Se o status for pending ou delivered, não há ação de atualização aqui */}
+                          {/* Se o status for delivered ou canceled, não há ação de atualização aqui */}
                         </TableCell>
                       </TableRow>
                     ))}

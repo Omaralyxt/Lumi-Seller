@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, DollarSign, Calendar, User, MapPin, Loader2, Truck, CheckCircle, Phone, Mail } from "lucide-react";
+import { ArrowLeft, Package, DollarSign, Calendar, User, MapPin, Loader2, Truck, CheckCircle, Phone, Mail, XCircle, Clipboard, Send } from "lucide-react";
 import { useStore } from "@/hooks/use-store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,8 +10,61 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useParams, useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Order, OrderItem, Customer } from "@/types/database"; // Usando tipagem centralizada
+import { Order, OrderItem, Customer } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+
+// Componente para gerenciar o código de rastreio
+const TrackingCodeManager = ({ orderId, initialCode, isUpdating, onUpdate }: { orderId: string, initialCode: string | null, isUpdating: boolean, onUpdate: (code: string | null) => void }) => {
+  const [trackingCode, setTrackingCode] = useState(initialCode || '');
+  const [isEditing, setIsEditing] = useState(!initialCode);
+
+  const handleSave = () => {
+    onUpdate(trackingCode.trim() || null);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setTrackingCode(initialCode || '');
+    setIsEditing(false);
+  };
+
+  return (
+    <Card className="rounded-xl">
+      <CardHeader>
+        <CardTitle className="font-heading text-xl flex items-center"><Send className="h-5 w-5 mr-2" /> Código de Rastreio</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isEditing ? (
+          <div className="flex space-x-2">
+            <Input
+              placeholder="Insira o código de rastreio"
+              value={trackingCode}
+              onChange={(e) => setTrackingCode(e.target.value)}
+              disabled={isUpdating}
+              className="rounded-lg"
+            />
+            <Button onClick={handleSave} disabled={isUpdating || trackingCode.trim().length === 0} size="sm" className="rounded-xl">
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Salvar'}
+            </Button>
+            <Button onClick={handleCancel} variant="outline" size="sm" className="rounded-xl" disabled={isUpdating}>
+              Cancelar
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-between items-center">
+            <p className="font-medium text-primary break-all">{initialCode || 'Nenhum código inserido.'}</p>
+            <Button onClick={() => setIsEditing(true)} variant="outline" size="sm" className="rounded-xl">
+              Editar
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 
 const OrderDetail = () => {
   const { id: orderId } = useParams<{ id: string }>();
@@ -102,32 +155,44 @@ const OrderDetail = () => {
 
   // Mutação para atualização de status
   const updateStatusMutation = useMutation({
-    mutationFn: async (newStatus: Order['status']) => {
+    mutationFn: async ({ newStatus, trackingCode }: { newStatus?: Order['status'], trackingCode?: string | null }) => {
       if (!orderId) throw new Error("ID do pedido ausente.");
       
+      const updates: Partial<Order> = {};
+      if (newStatus) updates.status = newStatus;
+      if (trackingCode !== undefined) updates.tracking_code = trackingCode;
+
       const { error } = await supabase
         .from('orders')
-        .update({ status: newStatus })
+        .update(updates)
         .eq('id', orderId);
 
       if (error) {
         throw new Error(error.message);
       }
     },
-    onSuccess: (_, newStatus) => {
-      showSuccess(`Status do pedido atualizado para ${newStatus}!`);
+    onSuccess: (_, variables) => {
+      if (variables.newStatus) {
+        showSuccess(`Status do pedido atualizado para ${variables.newStatus}!`);
+      } else if (variables.trackingCode !== undefined) {
+        showSuccess(`Código de rastreio ${variables.trackingCode ? 'salvo' : 'removido'} com sucesso!`);
+      }
       // Invalida queries para re-fetch dos dados
       queryClient.invalidateQueries({ queryKey: ['order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
     },
     onError: (err) => {
-      showError(`Erro ao atualizar status: ${err.message}`);
+      showError(`Erro ao atualizar: ${err.message}`);
     },
   });
 
   const handleUpdateStatus = (newStatus: Order['status']) => {
-    updateStatusMutation.mutate(newStatus);
+    updateStatusMutation.mutate({ newStatus });
+  };
+
+  const handleUpdateTrackingCode = (code: string | null) => {
+    updateStatusMutation.mutate({ trackingCode: code });
   };
 
   const getStatusBadge = (status: Order['status']) => {
@@ -136,10 +201,14 @@ const OrderDetail = () => {
         return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 rounded-full">Pago</Badge>;
       case 'pending':
         return <Badge variant="secondary" className="rounded-full">Pendente</Badge>;
+      case 'processing':
+        return <Badge className="bg-purple-500 hover:bg-purple-600 rounded-full">Processando</Badge>;
       case 'shipped':
         return <Badge className="bg-yellow-500 hover:bg-yellow-600 rounded-full">Enviado</Badge>;
       case 'delivered':
         return <Badge className="bg-green-500 hover:bg-green-600 rounded-full">Entregue</Badge>;
+      case 'canceled':
+        return <Badge variant="destructive" className="rounded-full">Cancelado</Badge>;
       default:
         return <Badge variant="outline" className="rounded-full">{status}</Badge>;
     }
@@ -168,7 +237,6 @@ const OrderDetail = () => {
   }
 
   const subtotal = items?.reduce((sum, item) => sum + (item.price_at_purchase * item.quantity), 0) || 0;
-  // Calculamos o custo de envio como a diferença, assumindo que o total inclui o frete.
   const shippingCost = order.total_amount - subtotal;
 
   const customerName = customer?.full_name || 'Cliente Não Encontrado';
@@ -195,7 +263,7 @@ const OrderDetail = () => {
         <div className="lg:col-span-1 space-y-6">
           <Card className={cn(
             "rounded-xl border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 neon-glow",
-            "animate-pulse-light" // Animação leve no card principal
+            "animate-pulse-light"
           )}>
             <CardHeader>
               <CardTitle className="font-heading text-xl flex items-center"><DollarSign className="h-5 w-5 mr-2" /> Resumo do Pedido</CardTitle>
@@ -208,6 +276,10 @@ const OrderDetail = () => {
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">Frete:</span>
                 <span className="font-medium">MZN {shippingCost.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Forma de Pagamento:</span>
+                <span className="font-medium">{order.payment_method || 'Não especificado'}</span>
               </div>
               <Separator />
               <div className="flex justify-between items-center">
@@ -228,12 +300,30 @@ const OrderDetail = () => {
           {/* Ações de Status */}
           <Card className="rounded-xl">
             <CardHeader>
-              <CardTitle className="font-heading text-xl flex items-center"><Truck className="h-5 w-5 mr-2" /> Ações de Envio</CardTitle>
+              <CardTitle className="font-heading text-xl flex items-center"><Truck className="h-5 w-5 mr-2" /> Gerenciar Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {order.status === 'pending' && (
+                <Button 
+                  className="w-full font-heading bg-purple-500 hover:bg-purple-600 rounded-xl neon-glow"
+                  onClick={() => handleUpdateStatus('processing')}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Clipboard className="h-4 w-4 mr-2" />} Marcar como Processando
+                </Button>
+              )}
               {order.status === 'paid' && (
                 <Button 
-                  className="w-full font-heading bg-blue-500 hover:bg-blue-600 rounded-xl neon-glow"
+                  className="w-full font-heading bg-purple-500 hover:bg-purple-600 rounded-xl neon-glow"
+                  onClick={() => handleUpdateStatus('processing')}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Clipboard className="h-4 w-4 mr-2" />} Marcar como Processando
+                </Button>
+              )}
+              {order.status === 'processing' && (
+                <Button 
+                  className="w-full font-heading bg-yellow-500 hover:bg-yellow-600 rounded-xl neon-glow"
                   onClick={() => handleUpdateStatus('shipped')}
                   disabled={isUpdating}
                 >
@@ -249,14 +339,36 @@ const OrderDetail = () => {
                   {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />} Marcar como Entregue
                 </Button>
               )}
-              {order.status === 'delivered' && (
-                <p className="text-center text-green-600 font-medium">Pedido concluído com sucesso!</p>
+              
+              {/* Ação de Cancelamento (Disponível se não estiver entregue ou cancelado) */}
+              {order.status !== 'delivered' && order.status !== 'canceled' && (
+                <Button 
+                  variant="destructive"
+                  className="w-full font-heading rounded-xl"
+                  onClick={() => handleUpdateStatus('canceled')}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />} Cancelar Pedido
+                </Button>
               )}
-              {order.status === 'pending' && (
-                <p className="text-center text-yellow-600 font-medium">Aguardando confirmação de pagamento.</p>
+
+              {(order.status === 'delivered' || order.status === 'canceled') && (
+                <p className={`text-center font-medium ${order.status === 'delivered' ? 'text-green-600' : 'text-destructive'}`}>
+                  Pedido {order.status === 'delivered' ? 'concluído' : 'cancelado'}.
+                </p>
               )}
             </CardContent>
           </Card>
+
+          {/* Gerenciador de Código de Rastreio */}
+          {order.status !== 'delivered' && order.status !== 'canceled' && (
+            <TrackingCodeManager 
+              orderId={order.id}
+              initialCode={order.tracking_code}
+              isUpdating={isUpdating}
+              onUpdate={handleUpdateTrackingCode}
+            />
+          )}
 
           {/* Detalhes do Cliente */}
           <Card className="rounded-xl">
@@ -313,6 +425,9 @@ const OrderDetail = () => {
                 {shippingAddress}
               </p>
               <p className="mt-4 text-sm font-bold text-primary">
+                Código de Rastreio: <span className="font-medium text-foreground">{order.tracking_code || 'N/A'}</span>
+              </p>
+              <p className="mt-2 text-sm font-bold text-primary">
                 Status de Envio: {order.status === 'shipped' ? 'Enviado' : order.status === 'delivered' ? 'Entregue' : 'Aguardando Envio'}
               </p>
             </CardContent>

@@ -24,9 +24,12 @@ export interface ProductVariant {
 // Tipagem para Order
 export interface Order {
   id: string;
+  store_id: string; // Adicionado para consistência, embora já esteja no DB
   customer_id: string | null;
   total_amount: number;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered';
+  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'canceled'; // Novos status
+  tracking_code: string | null; // Novo campo
+  payment_method: string | null; // Novo campo
   created_at: string;
 }
 

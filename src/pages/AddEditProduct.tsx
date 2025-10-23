@@ -20,6 +20,8 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { Product, ProductVariant } from "@/types/database";
 import { useProductVariants, FormVariant } from "@/hooks/use-product-variants";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PRODUCT_CATEGORIES } from "@/lib/categories";
 
 // Esquema de Validação
 const productSchema = z.object({
@@ -27,7 +29,7 @@ const productSchema = z.object({
   name: z.string().min(3, "O nome é obrigatório."),
   description: z.string().nullable(),
   shipping_cost: z.coerce.number().min(0).nullable(),
-  category: z.string().nullable(),
+  category: z.string().min(1, "A categoria é obrigatória."), // Tornando obrigatório
   image_url: z.string().nullable(),
 });
 
@@ -57,7 +59,7 @@ const AddEditProduct = () => {
       name: "",
       description: "",
       shipping_cost: 0,
-      category: "",
+      category: "", // Valor inicial vazio para forçar a seleção
       image_url: null,
     },
   });
@@ -85,6 +87,7 @@ const AddEditProduct = () => {
           form.reset({
             ...productData,
             shipping_cost: productData.shipping_cost ? parseFloat(productData.shipping_cost as unknown as string) : 0,
+            category: productData.category || "", // Garante que category seja string
           });
           setPreviewImage(productData.image_url);
           
@@ -317,7 +320,29 @@ const AddEditProduct = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="category">Categoria</Label>
-                <Input id="category" placeholder="Roupas, Eletrônicos, etc." className="font-sans rounded-lg" {...form.register("category")} />
+                <Select
+                  onValueChange={(value) => form.setValue("category", value, { shouldValidate: true })}
+                  value={form.watch("category") || ""}
+                >
+                  <SelectTrigger className="font-sans rounded-lg">
+                    <SelectValue placeholder="Selecione uma categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRODUCT_CATEGORIES.map((group) => (
+                      <SelectGroup key={group.group}>
+                        <SelectLabel>{group.group}</SelectLabel>
+                        {group.categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.category && (
+                  <p className="text-destructive text-sm">{form.formState.errors.category.message}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="shipping">Custo de Envio (MZN)</Label>

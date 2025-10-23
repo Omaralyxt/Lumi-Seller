@@ -4,7 +4,7 @@ export interface Product {
   store_id: string;
   name: string;
   description: string | null;
-  category: string | null;
+  category: string; // Alterado de string | null para string
   shipping_cost: number | null;
   image_url: string | null;
   created_at: string;

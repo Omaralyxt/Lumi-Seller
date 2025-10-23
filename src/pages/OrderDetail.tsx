@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, DollarSign, Calendar, User, MapPin, Loader2, Truck, CheckCircle } from "lucide-react";
+import { ArrowLeft, Package, DollarSign, Calendar, User, MapPin, Loader2, Truck, CheckCircle, Phone, Mail } from "lucide-react";
 import { useStore } from "@/hooks/use-store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -173,8 +173,10 @@ const OrderDetail = () => {
 
   const customerName = customer?.full_name || 'Cliente Não Encontrado';
   const customerEmail = customer?.email || 'N/A';
+  const customerPhone = customer?.phone || 'N/A';
+  
   const shippingAddress = customer ? 
-    `${customer.shipping_address}, ${customer.city} - ${customer.state}, ${customer.zip_code}` : 
+    `${customer.shipping_address}\n${customer.city} - ${customer.state}, ${customer.zip_code}` : 
     'Endereço de envio não disponível.';
 
   const isUpdating = updateStatusMutation.isPending;
@@ -189,14 +191,14 @@ const OrderDetail = () => {
       </header>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Coluna 1: Status e Resumo */}
+        {/* Coluna 1: Status, Resumo e Cliente */}
         <div className="lg:col-span-1 space-y-6">
           <Card className={cn(
             "rounded-xl border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 neon-glow",
             "animate-pulse-light" // Animação leve no card principal
           )}>
             <CardHeader>
-              <CardTitle className="font-heading text-xl flex items-center"><DollarSign className="h-5 w-5 mr-2" /> Resumo</CardTitle>
+              <CardTitle className="font-heading text-xl flex items-center"><DollarSign className="h-5 w-5 mr-2" /> Resumo do Pedido</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center text-sm">
@@ -226,7 +228,7 @@ const OrderDetail = () => {
           {/* Ações de Status */}
           <Card className="rounded-xl">
             <CardHeader>
-              <CardTitle className="font-heading text-xl flex items-center"><Truck className="h-5 w-5 mr-2" /> Ações</CardTitle>
+              <CardTitle className="font-heading text-xl flex items-center"><Truck className="h-5 w-5 mr-2" /> Ações de Envio</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {order.status === 'paid' && (
@@ -256,21 +258,26 @@ const OrderDetail = () => {
             </CardContent>
           </Card>
 
+          {/* Detalhes do Cliente */}
           <Card className="rounded-xl">
             <CardHeader>
-              <CardTitle className="font-heading text-xl flex items-center"><User className="h-5 w-5 mr-2" /> Cliente</CardTitle>
+              <CardTitle className="font-heading text-xl flex items-center"><User className="h-5 w-5 mr-2" /> Detalhes do Comprador</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="font-bold">{customerName}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Email: {customerEmail}<br/>
-                ID: {order.customer_id ? order.customer_id.substring(0, 8) : 'N/A'}
-              </p>
+            <CardContent className="space-y-2">
+              <p className="font-bold text-lg">{customerName}</p>
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Mail className="h-4 w-4 mr-2" />
+                <span>{customerEmail}</span>
+              </div>
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Phone className="h-4 w-4 mr-2" />
+                <span>{customerPhone}</span>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Coluna 2 & 3: Itens e Envio */}
+        {/* Coluna 2 & 3: Itens e Endereço */}
         <div className="lg:col-span-2 space-y-6">
           <Card className="rounded-xl">
             <CardHeader>
@@ -283,7 +290,9 @@ const OrderDetail = () => {
                     <li key={item.id} className="flex justify-between items-center border-b border-border/50 pb-2 last:border-b-0 last:pb-0 hover:bg-muted/20 p-2 rounded-lg transition-colors">
                       <div className="flex flex-col">
                         <span className="font-medium">{item.product_name}</span>
-                        <span className="text-sm text-muted-foreground">Qtd: {item.quantity}</span>
+                        <span className="text-sm text-muted-foreground">
+                          Qtd: {item.quantity} @ MZN {item.price_at_purchase.toFixed(2)}
+                        </span>
                       </div>
                       <span className="font-bold text-primary">MZN {(item.price_at_purchase * item.quantity).toFixed(2)}</span>
                     </li>
@@ -303,8 +312,8 @@ const OrderDetail = () => {
               <p className="text-muted-foreground whitespace-pre-line">
                 {shippingAddress}
               </p>
-              <p className="mt-2 text-sm font-bold">
-                Rastreamento: [Código de Rastreio Placeholder]
+              <p className="mt-4 text-sm font-bold text-primary">
+                Status de Envio: {order.status === 'shipped' ? 'Enviado' : order.status === 'delivered' ? 'Entregue' : 'Aguardando Envio'}
               </p>
             </CardContent>
           </Card>

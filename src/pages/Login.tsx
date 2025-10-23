@@ -1,25 +1,30 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SupabaseAuth from '@/components/SupabaseAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/use-auth';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { session, loading } = useAuth(); // Usamos o useAuth para reagir ao estado global
 
-  // Redirect authenticated users away from the login page immediately
+  // Redireciona usuários autenticados para o dashboard
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate('/dashboard', { replace: true });
-      }
-    };
+    if (!loading && session) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [session, loading, navigate]);
 
-    checkUser();
-    
-    // We rely on App.tsx's useAuth for global state, but keep this local check for immediate redirect.
-  }, [navigate]);
+  if (loading) {
+    // Mostra um spinner enquanto verifica o estado inicial da sessão
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <LoadingSpinner size={48} />
+      </div>
+    );
+  }
 
+  // Se não estiver logado, mostra o formulário de autenticação
   return <SupabaseAuth />;
 };
 

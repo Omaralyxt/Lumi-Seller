@@ -23,21 +23,21 @@ const fetchDashboardMetrics = async (storeId: string) => {
 
   if (productError) throw new Error(productError.message);
 
-  // 2. Pedidos Pendentes (status 'paid' ou 'pending')
+  // 2. Pedidos Pendentes (status 'paid' ou 'pending' ou 'processing')
   const { count: pendingOrders, error: pendingError } = await supabase
     .from('orders')
     .select('id', { count: 'exact', head: true })
     .eq('store_id', storeId)
-    .in('status', ['paid', 'pending']); // Pedidos que precisam de atenção
+    .in('status', ['paid', 'pending', 'processing']); // Pedidos que precisam de atenção
 
   if (pendingError) throw new Error(pendingError.message);
 
-  // 3. Saldo Atual (Total de vendas - simplificado para todos os pedidos não pendentes)
+  // 3. Saldo Atual (Total de vendas - simplificado para todos os pedidos entregues)
   const { data: salesData, error: salesError } = await supabase
     .from('orders')
     .select('total_amount')
     .eq('store_id', storeId)
-    .in('status', ['paid', 'shipped', 'delivered']);
+    .in('status', ['delivered']); // Apenas pedidos entregues contam como saldo final
 
   if (salesError) throw new Error(salesError.message);
 
@@ -75,10 +75,14 @@ const getStatusBadge = (status: Order['status']) => {
       return <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 rounded-full">Pago</Badge>;
     case 'pending':
       return <Badge variant="secondary" className="rounded-full">Pendente</Badge>;
+    case 'processing':
+      return <Badge className="bg-purple-500 hover:bg-purple-600 rounded-full">Processando</Badge>;
     case 'shipped':
       return <Badge className="bg-yellow-500 hover:bg-yellow-600 rounded-full">Enviado</Badge>;
     case 'delivered':
       return <Badge className="bg-green-500 hover:bg-green-600 rounded-full">Entregue</Badge>;
+    case 'canceled':
+      return <Badge variant="destructive" className="rounded-full">Cancelado</Badge>;
     default:
       return <Badge variant="outline" className="rounded-full">{status}</Badge>;
   }
@@ -89,6 +93,7 @@ const Dashboard = () => {
   const { profile } = useAuth();
   const { store, loading: storeLoading } = useStore();
   
+  // Habilita as queries somente se a loja estiver carregada e não estiver em estado de carregamento inicial
   const enabled = !!store && !storeLoading;
 
   const { data: metrics, isLoading: metricsLoading, error: metricsError } = useQuery({
@@ -161,7 +166,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-heading">MZN {balance.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground font-sans">Total acumulado de pedidos pagos</p>
+            <p className="text-xs text-muted-foreground font-sans">Total acumulado de pedidos entregues</p>
           </CardContent>
         </Card>
         

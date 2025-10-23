@@ -77,13 +77,12 @@ const SupabaseAuth = () => {
                   inputBorderFocus: 'hsl(var(--ring))',
                 },
                 fontSizes: {
-                    // Removido 'base'
-                    large: '1.125rem',
-                    xl: '1.25rem',
+                    // Mantendo apenas as propriedades tipadas
+                    baseButtonSize: '1.125rem', // Usando baseButtonSize para controlar o tamanho do texto do botão
                 },
                 fonts: {
-                    // Removido 'body'
-                    button: 'Bebas Neue, sans-serif',
+                    // Mantendo apenas as propriedades tipadas
+                    buttonFontFamily: 'Bebas Neue, sans-serif', // Usando buttonFontFamily
                 }
               },
             },

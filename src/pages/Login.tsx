@@ -6,25 +6,18 @@ import { supabase } from '@/integrations/supabase/client';
 const Login = () => {
   const navigate = useNavigate();
 
+  // Redirect authenticated users away from the login page immediately
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        navigate('/');
+        navigate('/dashboard', { replace: true });
       }
     };
 
     checkUser();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        navigate('/');
-      }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    
+    // We rely on App.tsx's useAuth for global state, but keep this local check for immediate redirect.
   }, [navigate]);
 
   return <SupabaseAuth />;

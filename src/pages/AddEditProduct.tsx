@@ -292,12 +292,12 @@ const AddEditProduct = () => {
         if (upsertImagesError) throw new Error(`Erro ao salvar imagens: ${upsertImagesError.message}`);
       }
 
-      // 3. Gerenciar Variantes (Lógica de otimização mantida)
-      const existingVariantIds = initialVariants.map(v => v.id);
-      const currentVariantIds = variants.map(v => v.id).filter(id => !id.startsWith('temp-'));
-
-      // 3a. Deleção de variantes removidas
-      const variantsToDelete = existingVariantIds.filter(id => !currentVariantIds.includes(id));
+      // 3. Gerenciar Variantes (Lógica de otimização)
+      
+      // 3a. Identificar IDs de variantes existentes que foram removidas
+      const activeExistingVariantIds = variants.filter(v => !v.isNew).map(v => v.id);
+      const variantsToDelete = initialVariants.map(v => v.id).filter(id => !activeExistingVariantIds.includes(id));
+      
       if (variantsToDelete.length > 0) {
         const { error: deleteError } = await supabase
           .from('product_variants')
@@ -306,17 +306,10 @@ const AddEditProduct = () => {
         if (deleteError) console.error("Erro ao deletar variantes antigas:", deleteError);
       }
 
-      // 3b. Inserir/Atualizar variantes (Executando em paralelo)
-      const variantsToInsert = variants.filter(v => v.isNew).map(v => ({
-        product_id: newProductId!,
-        store_id: store.id,
-        name: v.name,
-        price: v.price,
-        stock: v.stock,
-      }));
-
-      const variantsToUpdate = variants.filter(v => !v.isNew).map(v => ({
-        id: v.id,
+      // 3b. Inserir/Atualizar variantes
+      const variantsToUpsert = variants.map(v => ({
+        // Inclui o ID se for uma atualização, omite se for uma nova inserção (o DB gera o ID)
+        ...(v.isNew ? {} : { id: v.id }), 
         product_id: newProductId!,
         store_id: store.id,
         name: v.name,
@@ -324,19 +317,14 @@ const AddEditProduct = () => {
         stock: v.stock,
       }));
       
-      const insertPromise = variantsToInsert.length > 0 
-        ? supabase.from('product_variants').insert(variantsToInsert)
-        : Promise.resolve({ error: null });
+      if (variantsToUpsert.length > 0) {
+        // Usamos upsert para lidar com inserções (sem id) e atualizações (com id) em uma única chamada
+        const { error: upsertError } = await supabase
+          .from('product_variants')
+          .upsert(variantsToUpsert);
 
-      const updatePromise = variantsToUpdate.length > 0 
-        ? supabase.from('product_variants').upsert(variantsToUpdate)
-        : Promise.resolve({ error: null });
-
-      const [insertResult, updateResult] = await Promise.all([insertPromise, updatePromise]);
-
-      if (insertResult.error) throw new Error(`Erro ao inserir variantes: ${insertResult.error.message}`);
-      if (updateResult.error) throw new Error(`Erro ao atualizar variantes: ${updateResult.error.message}`);
-
+        if (upsertError) throw new Error(`Erro ao salvar variantes: ${upsertError.message}`);
+      }
 
       // Feedback e Redirecionamento
       showSuccess(`Produto ${productId ? 'atualizado' : 'criado'} com sucesso!`);

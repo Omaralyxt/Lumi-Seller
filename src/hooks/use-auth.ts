@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
+import { showError, showSuccess } from '@/utils/toast';
 
 interface Profile {
   id: string;
@@ -14,40 +15,42 @@ interface AuthState {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  updateProfile: (updates: Partial<Omit<Profile, 'id' | 'role'>>) => Promise<boolean>;
 }
 
+const fetchProfile = async (userId: string): Promise<Profile | null> => {
+  const { data: profileData, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (profileError && profileError.code !== 'PGRST116') {
+    console.error('Error fetching profile:', profileError);
+    return null;
+  }
+  return profileData as Profile;
+};
+
 export const useAuth = () => {
-  const [authState, setAuthState] = useState<AuthState>({
+  const [authState, setAuthState] = useState<Omit<AuthState, 'updateProfile'>>({
     session: null,
     profile: null,
     loading: true,
   });
 
+  const loadSessionAndProfile = useCallback(async (currentSession: Session | null) => {
+    if (currentSession) {
+      const profile = await fetchProfile(currentSession.user.id);
+      setAuthState({ session: currentSession, profile, loading: false });
+    } else {
+      setAuthState({ session: null, profile: null, loading: false });
+    }
+  }, []);
+
   useEffect(() => {
-    const loadSessionAndProfile = async (currentSession: Session | null) => {
-      if (currentSession) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentSession.user.id)
-          .single();
-
-        if (profileError && profileError.code !== 'PGRST116') { // PGRST116 means no rows found (new user)
-          console.error('Error fetching profile:', profileError);
-          setAuthState({ session: currentSession, profile: null, loading: false });
-        } else if (profileData) {
-          setAuthState({ session: currentSession, profile: profileData as Profile, loading: false });
-        } else {
-          // Profile not found, likely a new user who hasn't completed setup yet.
-          setAuthState({ session: currentSession, profile: null, loading: false });
-        }
-      } else {
-        setAuthState({ session: null, profile: null, loading: false });
-      }
-    };
-
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         await loadSessionAndProfile(session);
       } else if (event === 'SIGNED_OUT') {
         setAuthState({ session: null, profile: null, loading: false });
@@ -62,7 +65,36 @@ export const useAuth = () => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [loadSessionAndProfile]);
 
-  return authState;
+  const updateProfile = async (updates: Partial<Omit<Profile, 'id' | 'role'>>): Promise<boolean> => {
+    if (!authState.profile) {
+      showError("Usuário não autenticado.");
+      return false;
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', authState.profile.id)
+      .select()
+      .single();
+
+    if (error) {
+      showError(`Erro ao atualizar perfil: ${error.message}`);
+      return false;
+    }
+
+    if (data) {
+      setAuthState((prev) => ({
+        ...prev,
+        profile: data as Profile,
+      }));
+      showSuccess("Perfil atualizado com sucesso!");
+      return true;
+    }
+    return false;
+  };
+
+  return { ...authState, updateProfile };
 };

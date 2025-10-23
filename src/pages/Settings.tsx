@@ -16,6 +16,7 @@ import * as z from "zod";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { deleteProductImage, uploadProductImage } from "@/integrations/supabase/storage"; // Reutilizando funções de storage
+import { showSuccess } from "@/utils/toast";
 
 // Esquema de Validação para Configurações da Loja
 const storeSettingsSchema = z.object({
@@ -26,16 +27,26 @@ const storeSettingsSchema = z.object({
 
 type StoreSettingsFormValues = z.infer<typeof storeSettingsSchema>;
 
+// Esquema de Validação para Perfil do Usuário
+const profileSettingsSchema = z.object({
+  first_name: z.string().min(1, "O primeiro nome é obrigatório."),
+  last_name: z.string().min(1, "O sobrenome é obrigatório."),
+});
+
+type ProfileSettingsFormValues = z.infer<typeof profileSettingsSchema>;
+
 const Settings = () => {
   const navigate = useNavigate();
   const { store, loading: storeLoading, updateStore } = useStore();
-  const { profile } = useAuth();
+  const { profile, loading: authLoading, updateProfile } = useAuth();
   
   const [isSavingStore, setIsSavingStore] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [previewLogo, setPreviewLogo] = useState<string | null>(null);
 
-  const form = useForm<StoreSettingsFormValues>({
+  // Formulário da Loja
+  const storeForm = useForm<StoreSettingsFormValues>({
     resolver: zodResolver(storeSettingsSchema),
     defaultValues: {
       name: "",
@@ -44,17 +55,32 @@ const Settings = () => {
     },
   });
 
-  // Preencher formulário quando a loja carregar
+  // Formulário do Perfil
+  const profileForm = useForm<ProfileSettingsFormValues>({
+    resolver: zodResolver(profileSettingsSchema),
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+    },
+  });
+
+  // Preencher formulários quando os dados carregarem
   useEffect(() => {
     if (store) {
-      form.reset({
+      storeForm.reset({
         name: store.name,
         description: store.description,
         logo_url: store.logo_url,
       });
       setPreviewLogo(store.logo_url);
     }
-  }, [store, form]);
+    if (profile) {
+      profileForm.reset({
+        first_name: profile.first_name || "",
+        last_name: profile.last_name || "",
+      });
+    }
+  }, [store, profile, storeForm, profileForm]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -63,27 +89,25 @@ const Settings = () => {
     }
   };
 
+  // --- Lógica de Logotipo da Loja ---
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setFileToUpload(file);
     if (file) {
       setPreviewLogo(URL.createObjectURL(file));
     } else {
-      setPreviewLogo(form.getValues('logo_url'));
+      setPreviewLogo(storeForm.getValues('logo_url'));
     }
   };
 
   const handleRemoveLogo = async () => {
-    const currentUrl = form.getValues('logo_url');
+    const currentUrl = storeForm.getValues('logo_url');
     if (currentUrl) {
-      // Reutilizando a função de exclusão de imagem de produto, mas o bucket é o mesmo (products)
-      // Nota: Idealmente, teríamos um bucket 'logos' separado, mas vamos reutilizar 'products' por simplicidade.
       await deleteProductImage(currentUrl); 
     }
     setFileToUpload(null);
     setPreviewLogo(null);
-    form.setValue('logo_url', null);
-    // Não salvamos no DB aqui, apenas no submit
+    storeForm.setValue('logo_url', null);
   };
 
   const handleSaveStore = async (values: StoreSettingsFormValues) => {
@@ -95,12 +119,10 @@ const Settings = () => {
     try {
       // 1. Upload do novo logotipo, se houver
       if (fileToUpload) {
-        // Se houver um logo antigo, deleta
         if (values.logo_url) {
           await deleteProductImage(values.logo_url);
         }
         
-        // Usamos a função de upload de produto, mas o caminho é baseado no ID do usuário
         const uploadedUrl = await uploadProductImage(fileToUpload, profile.id);
         if (!uploadedUrl) {
           throw new Error("Falha ao fazer upload do logotipo.");
@@ -109,22 +131,27 @@ const Settings = () => {
       }
 
       // 2. Atualizar dados da loja
-      const success = await updateStore({
+      await updateStore({
         name: values.name,
         description: values.description,
         logo_url: logoUrl,
       });
 
-      if (success) {
-        showSuccess("Configurações da loja salvas com sucesso!");
-      }
-
     } catch (error) {
       console.error("Erro ao salvar configurações da loja:", error);
-      // O updateStore já mostra o erro, mas garantimos o fallback
     } finally {
       setIsSavingStore(false);
       setFileToUpload(null); // Limpa o arquivo após o upload
+    }
+  };
+
+  // --- Lógica de Perfil do Usuário ---
+  const handleSaveProfile = async (values: ProfileSettingsFormValues) => {
+    setIsSavingProfile(true);
+    try {
+      await updateProfile(values);
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -133,7 +160,7 @@ const Settings = () => {
     alert("Funcionalidade de atualização de email/senha não implementada. Use o Supabase Auth UI para isso.");
   };
 
-  if (storeLoading) {
+  if (storeLoading || authLoading) {
     return (
       <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-4xl mx-auto">
         <Skeleton className="h-8 w-64 mb-8" />
@@ -151,9 +178,62 @@ const Settings = () => {
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-4xl mx-auto">
       <header className="mb-8">
-        <h1 className="text-3xl font-heading font-bold text-primary mb-2">Configurações da Loja</h1>
-        <p className="text-md text-muted-foreground">Gerencie as informações da sua loja e suas credenciais de acesso.</p>
+        <h1 className="text-3xl font-heading font-bold text-primary mb-2">Configurações</h1>
+        <p className="text-md text-muted-foreground">Gerencie as informações da sua loja e seu perfil de acesso.</p>
       </header>
+
+      {/* User Profile Settings */}
+      <Card className={cn(
+        "mb-8 border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300"
+      )}>
+        <CardHeader>
+          <CardTitle className="font-heading text-xl flex items-center"><User className="h-5 w-5 mr-2" /> Perfil do Vendedor</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={profileForm.handleSubmit(handleSaveProfile)} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="firstName">Primeiro Nome</Label>
+                <Input 
+                  id="firstName" 
+                  placeholder="João" 
+                  className="font-sans" 
+                  {...profileForm.register("first_name")}
+                />
+                {profileForm.formState.errors.first_name && (
+                  <p className="text-destructive text-sm">{profileForm.formState.errors.first_name.message}</p>
+                )}
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="lastName">Sobrenome</Label>
+                <Input 
+                  id="lastName" 
+                  placeholder="Silva" 
+                  className="font-sans" 
+                  {...profileForm.register("last_name")}
+                />
+                {profileForm.formState.errors.last_name && (
+                  <p className="text-destructive text-sm">{profileForm.formState.errors.last_name.message}</p>
+                )}
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="email">Email (Não Editável)</Label>
+              <Input id="email" type="email" placeholder={profile?.session?.user.email || "N/A"} className="font-sans" disabled />
+            </div>
+            <Button type="submit" className="w-full font-heading" disabled={isSavingProfile}>
+              {isSavingProfile ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-5 w-5" />
+              )}
+              {isSavingProfile ? "Salvando..." : "Salvar Perfil"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Separator className="my-8" />
 
       {/* Store Settings */}
       <Card className={cn(
@@ -163,17 +243,17 @@ const Settings = () => {
           <CardTitle className="font-heading text-xl flex items-center"><Store className="h-5 w-5 mr-2" /> Informações da Loja</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={form.handleSubmit(handleSaveStore)} className="space-y-4">
+          <form onSubmit={storeForm.handleSubmit(handleSaveStore)} className="space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="storeName">Nome da Loja</Label>
               <Input 
                 id="storeName" 
                 placeholder="Lumi Store Oficial" 
                 className="font-sans" 
-                {...form.register("name")}
+                {...storeForm.register("name")}
               />
-              {form.formState.errors.name && (
-                <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>
+              {storeForm.formState.errors.name && (
+                <p className="text-destructive text-sm">{storeForm.formState.errors.name.message}</p>
               )}
             </div>
             <div className="grid gap-2">
@@ -183,7 +263,7 @@ const Settings = () => {
                 placeholder="Uma breve descrição da sua loja..." 
                 rows={3} 
                 className="font-sans" 
-                {...form.register("description")}
+                {...storeForm.register("description")}
               />
             </div>
             
@@ -234,32 +314,6 @@ const Settings = () => {
                 <Save className="mr-2 h-5 w-5" />
               )}
               {isSavingStore ? "Salvando..." : "Salvar Configurações da Loja"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Separator className="my-8" />
-
-      {/* Account Settings (Placeholder) */}
-      <Card className={cn(
-        "mb-8 border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300"
-      )}>
-        <CardHeader>
-          <CardTitle className="font-heading text-xl flex items-center"><User className="h-5 w-5 mr-2" /> Credenciais de Acesso</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleUpdateCredentials} className="space-y-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder={profile?.email || "Carregando..."} className="font-sans" disabled />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="password">Nova Senha</Label>
-              <Input id="password" type="password" placeholder="Deixe em branco para não alterar" className="font-sans" disabled />
-            </div>
-            <Button type="submit" variant="secondary" className="w-full font-heading" disabled>
-              <Save className="mr-2 h-5 w-5" /> Atualizar Email/Senha (Desabilitado)
             </Button>
           </form>
         </CardContent>

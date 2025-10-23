@@ -1,11 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package, DollarSign, Calendar, User, MapPin, Loader2 } from "lucide-react";
+import { ArrowLeft, Package, DollarSign, Calendar, User, MapPin, Loader2, Truck, CheckCircle } from "lucide-react";
 import { useStore } from "@/hooks/use-store";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { showError } from "@/utils/toast";
+import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useParams, useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
@@ -45,6 +45,7 @@ const OrderDetail = () => {
   const { id: orderId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { store, loading: storeLoading } = useStore();
+  const queryClient = useQueryClient();
   
   usePageTitle(`Pedido #${orderId ? orderId.substring(0, 8) : 'Detalhes'}`);
 
@@ -127,6 +128,36 @@ const OrderDetail = () => {
     enabled: !!order?.customer_id && !isOrderLoading,
   });
 
+  // Mutação para atualização de status
+  const updateStatusMutation = useMutation({
+    mutationFn: async (newStatus: Order['status']) => {
+      if (!orderId) throw new Error("ID do pedido ausente.");
+      
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: (_, newStatus) => {
+      showSuccess(`Status do pedido atualizado para ${newStatus}!`);
+      // Invalida queries para re-fetch dos dados
+      queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardMetrics'] });
+    },
+    onError: (err) => {
+      showError(`Erro ao atualizar status: ${err.message}`);
+    },
+  });
+
+  const handleUpdateStatus = (newStatus: Order['status']) => {
+    updateStatusMutation.mutate(newStatus);
+  };
+
   const getStatusBadge = (status: Order['status']) => {
     switch (status) {
       case 'paid':
@@ -174,11 +205,12 @@ const OrderDetail = () => {
     `${customer.shipping_address}, ${customer.city} - ${customer.state}, ${customer.zip_code}` : 
     'Endereço de envio não disponível.';
 
+  const isUpdating = updateStatusMutation.isPending;
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-6xl mx-auto">
-      <header className="mb-8 flex items-center justify-between">
-        <Button variant="ghost" onClick={() => navigate('/pedidos')}>
+      <header className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between">
+        <Button variant="ghost" onClick={() => navigate('/pedidos')} className="mb-4 sm:mb-0">
           <ArrowLeft className="h-5 w-5 mr-2" /> Voltar aos Pedidos
         </Button>
         <h1 className="text-3xl font-heading font-bold text-primary">Detalhes do Pedido #{order.id.substring(0, 8)}</h1>
@@ -213,6 +245,39 @@ const OrderDetail = () => {
                 <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                 <span className="text-muted-foreground">{new Date(order.created_at).toLocaleDateString('pt-BR')}</span>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Ações de Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-heading text-xl flex items-center"><Truck className="h-5 w-5 mr-2" /> Ações</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {order.status === 'paid' && (
+                <Button 
+                  className="w-full font-heading bg-blue-500 hover:bg-blue-600"
+                  onClick={() => handleUpdateStatus('shipped')}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Truck className="h-4 w-4 mr-2" />} Marcar como Enviado
+                </Button>
+              )}
+              {order.status === 'shipped' && (
+                <Button 
+                  className="w-full font-heading bg-green-500 hover:bg-green-600"
+                  onClick={() => handleUpdateStatus('delivered')}
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />} Marcar como Entregue
+                </Button>
+              )}
+              {order.status === 'delivered' && (
+                <p className="text-center text-green-600 font-medium">Pedido concluído com sucesso!</p>
+              )}
+              {order.status === 'pending' && (
+                <p className="text-center text-yellow-600 font-medium">Aguardando confirmação de pagamento.</p>
+              )}
             </CardContent>
           </Card>
 

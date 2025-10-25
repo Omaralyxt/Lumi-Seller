@@ -17,12 +17,14 @@ import Layout from "./components/Layout"; // Importando o novo Layout
 import LoadingSpinner from "./components/LoadingSpinner"; // Importando LoadingSpinner
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
+import { useOrdersRealtime } from "./hooks/use-orders-realtime"; // Importando o novo hook
 
 const queryClient = new QueryClient();
 
 // Componente para proteger rotas e aplicar o layout
 const ProtectedLayout = () => {
   const { session, loading, profile } = useAuth();
+  useOrdersRealtime(); // Ativa o listener Realtime aqui
 
   // 4. Bloquear acessos indevidos (Lumi Seller)
   useEffect(() => {

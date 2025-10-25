@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Truck, CheckCircle, Loader2, Eye, ShoppingCart, Clipboard } from "lucide-react";
+import { Truck, CheckCircle, Loader2, Eye, ShoppingCart, Clipboard, Filter } from "lucide-react";
 import { useStore } from "@/hooks/use-store";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,21 +12,40 @@ import { Link } from "react-router-dom";
 import { usePageTitle } from "@/hooks/use-page-title";
 import EmptyState from "@/components/EmptyState";
 import { Order } from "@/types/database";
+import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type FilterStatus = Order['status'] | 'all';
+
+const statusOptions: { value: FilterStatus, label: string }[] = [
+  { value: 'all', label: 'Todos os Status' },
+  { value: 'pending', label: 'Pendente' },
+  { value: 'paid', label: 'Pago' },
+  { value: 'processing', label: 'Processando' },
+  { value: 'shipped', label: 'Enviado' },
+  { value: 'delivered', label: 'Entregue' },
+  { value: 'canceled', label: 'Cancelado' },
+];
 
 const Orders = () => {
   usePageTitle("Pedidos");
   const { store, loading: storeLoading } = useStore();
   const queryClient = useQueryClient();
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
   // Função de busca de pedidos
-  const fetchOrders = async (): Promise<Order[]> => {
-    if (!store) return [];
-    
-    const { data, error } = await supabase
+  const fetchOrders = async (currentStoreId: string, statusFilter: FilterStatus): Promise<Order[]> => {
+    let query = supabase
       .from('orders')
       .select('*')
-      .eq('store_id', store.id)
+      .eq('store_id', currentStoreId)
       .order('created_at', { ascending: false });
+
+    if (statusFilter !== 'all') {
+      query = query.eq('status', statusFilter);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(error.message);
@@ -40,8 +59,8 @@ const Orders = () => {
   };
 
   const { data: orders, isLoading, error } = useQuery({
-    queryKey: ['orders', store?.id],
-    queryFn: fetchOrders,
+    queryKey: ['orders', store?.id, filterStatus], // Inclui o filtro na chave da query
+    queryFn: () => fetchOrders(store!.id, filterStatus),
     enabled: !!store && !storeLoading,
   });
 
@@ -127,9 +146,33 @@ const Orders = () => {
         <p className="text-md text-muted-foreground">Visualize e atualize o status dos pedidos da sua loja.</p>
       </header>
 
+      {/* Filtros */}
+      <div className="mb-6 flex justify-end">
+        <div className="flex items-center space-x-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select 
+            value={filterStatus} 
+            onValueChange={(value: FilterStatus) => setFilterStatus(value)}
+          >
+            <SelectTrigger className="w-[180px] rounded-xl">
+              <SelectValue placeholder="Filtrar por Status" />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <Card className="rounded-xl border-primary/50 hover:ring-2 hover:ring-primary/50 transition-all duration-300 neon-glow">
         <CardHeader>
-          <CardTitle className="font-heading text-xl">Pedidos Recentes</CardTitle>
+          <CardTitle className="font-heading text-xl">
+            {filterStatus === 'all' ? 'Todos os Pedidos' : `Pedidos: ${statusOptions.find(o => o.value === filterStatus)?.label}`}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {orders && orders.length > 0 ? (
@@ -202,7 +245,7 @@ const Orders = () => {
               <EmptyState
                 icon={ShoppingCart}
                 title="Nenhum Pedido Encontrado"
-                description="Sua loja ainda não recebeu pedidos. Continue adicionando produtos para começar a vender!"
+                description={filterStatus === 'all' ? "Sua loja ainda não recebeu pedidos. Continue adicionando produtos para começar a vender!" : `Nenhum pedido encontrado com o status: ${statusOptions.find(o => o.value === filterStatus)?.label}.`}
                 // Não há ação direta para criar um pedido, então omitimos actionText/actionLink
               />
             </div>

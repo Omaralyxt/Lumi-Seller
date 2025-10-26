@@ -14,6 +14,7 @@ import EmptyState from "@/components/EmptyState";
 import { Order } from "@/types/database";
 import { createTestOrder } from "@/integrations/supabase/orders"; // Importando a função de teste
 import { useState } from "react";
+import { useOrdersRealtime } from "@/hooks/use-orders-realtime"; // Importando o hook de Realtime
 
 // Função para buscar métricas do dashboard
 const fetchDashboardMetrics = async (storeId: string) => {
@@ -95,6 +96,9 @@ const Dashboard = () => {
   const { profile } = useAuth();
   const { store, loading: storeLoading } = useStore();
   const [isCreatingTestOrder, setIsCreatingTestOrder] = useState(false);
+  
+  // Ativa o listener Realtime para novos pedidos
+  useOrdersRealtime(); 
   
   // Habilita as queries somente se a loja estiver carregada e não estiver em estado de carregamento inicial
   const enabled = !!store && !storeLoading;

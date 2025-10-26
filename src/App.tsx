@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from 'sonner'; // Importando Toaster do sonner
 import { SessionContextProvider } from '@/integrations/supabase/session-context';
 import ProtectedRoute from './components/protected-route';
 import Index from './pages/Index';

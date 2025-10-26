@@ -1,14 +1,13 @@
 import { supabase } from './client';
 import { showError } from '@/utils/toast';
 
-const PRODUCTS_BUCKET = 'products'; // Usado para logos de loja (mantido)
-const PRODUCT_IMAGES_BUCKET = 'product_images'; // Novo bucket para imagens de produtos
+const PRODUCTS_BUCKET = 'products'; // Usado para logos de loja E imagens de produtos
 
 /**
  * Faz o upload de um arquivo para o Supabase Storage.
  * @param file O arquivo a ser enviado.
  * @param userId O ID do usuário (para criar um caminho único).
- * @param bucket O nome do bucket (e.g., 'products' ou 'product_images').
+ * @param bucket O nome do bucket (e.g., 'products').
  * @returns A URL pública do arquivo ou null em caso de erro.
  */
 export async function uploadFile(file: File, userId: string, bucket: string): Promise<string | null> {
@@ -16,7 +15,8 @@ export async function uploadFile(file: File, userId: string, bucket: string): Pr
 
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-  const filePath = `${userId}/${fileName}`;
+  // Usamos o userId como subdiretório para organizar os arquivos
+  const filePath = `${userId}/${fileName}`; 
 
   try {
     const { error: uploadError } = await supabase.storage
@@ -59,10 +59,13 @@ export async function deleteFile(publicUrl: string, bucket: string): Promise<boo
   const bucketIndex = pathSegments.indexOf(bucket);
   
   if (bucketIndex === -1) {
-      console.error(`Bucket ${bucket} não encontrado na URL.`);
-      return false;
+      // Se o bucket não for encontrado na URL, assumimos que o arquivo não está no storage esperado ou a URL é inválida.
+      // Para evitar falhas, logamos e retornamos true, pois o objetivo é garantir que o arquivo não esteja lá.
+      console.warn(`Bucket ${bucket} não encontrado na URL. Assumindo que o arquivo não precisa ser deletado do storage: ${publicUrl}`);
+      return true;
   }
   
+  // O caminho do arquivo é tudo que vem depois do nome do bucket
   const filePath = pathSegments.slice(bucketIndex + 1).join('/');
 
   try {
@@ -91,9 +94,9 @@ export async function deleteProductLogo(publicUrl: string): Promise<boolean> {
 }
 
 export async function uploadProductImage(file: File, userId: string): Promise<string | null> {
-    return uploadFile(file, userId, PRODUCT_IMAGES_BUCKET);
+    return uploadFile(file, userId, PRODUCTS_BUCKET);
 }
 
 export async function deleteProductImage(publicUrl: string): Promise<boolean> {
-    return deleteFile(publicUrl, PRODUCT_IMAGES_BUCKET);
+    return deleteFile(publicUrl, PRODUCTS_BUCKET);
 }

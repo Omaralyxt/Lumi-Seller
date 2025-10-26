@@ -14,6 +14,7 @@ import { Order, OrderItem, Customer } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import MpesaPaymentForm from "@/components/MpesaPaymentForm"; // Importando o novo componente
 
 // Componente para gerenciar o código de rastreio
 const TrackingCodeManager = ({ orderId, initialCode, isUpdating, onUpdate }: { orderId: string, initialCode: string | null, isUpdating: boolean, onUpdate: (code: string | null) => void }) => {
@@ -190,6 +191,11 @@ const OrderDetail = () => {
   const handleUpdateStatus = (newStatus: Order['status']) => {
     updateStatusMutation.mutate({ newStatus });
   };
+  
+  // Função para invalidar o pedido após a tentativa de pagamento (seja sucesso ou falha)
+  const handlePaymentInitiated = () => {
+    queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+  };
 
   const handleUpdateTrackingCode = (code: string | null) => {
     updateStatusMutation.mutate({ trackingCode: code });
@@ -297,6 +303,16 @@ const OrderDetail = () => {
               </div>
             </CardContent>
           </Card>
+          
+          {/* Formulário de Pagamento M-Pesa (Apenas se o status for pendente e o método for M-Pesa) */}
+          {(order.status === 'pending' || order.status === 'processing') && order.payment_method === 'M-Pesa' && (
+            <MpesaPaymentForm 
+              orderId={order.id}
+              orderNumber={order.order_number || order.id}
+              amount={order.total_amount}
+              onPaymentInitiated={handlePaymentInitiated}
+            />
+          )}
 
           {/* Ações de Status */}
           <Card className="rounded-xl">
@@ -431,6 +447,11 @@ const OrderDetail = () => {
               <p className="mt-2 text-sm font-bold text-primary">
                 Status de Envio: {order.status === 'shipped' ? 'Enviado' : order.status === 'delivered' ? 'Entregue' : 'Aguardando Envio'}
               </p>
+              {order.mpesa_transaction_id && (
+                <p className="mt-2 text-sm font-bold text-green-600">
+                  ID Transação M-Pesa: <span className="font-medium text-foreground">{order.mpesa_transaction_id}</span>
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -10,8 +10,8 @@ const Index = () => {
   useEffect(() => {
     if (!loading) {
       if (session) {
-        // Usuário autenticado, redireciona para o dashboard
-        navigate('/dashboard', { replace: true });
+        // Usuário autenticado, redireciona para a configuração da loja (que por sua vez redireciona para o dashboard)
+        navigate('/store-setup', { replace: true });
       } else {
         // Usuário não autenticado, redireciona para o login
         navigate('/login', { replace: true });

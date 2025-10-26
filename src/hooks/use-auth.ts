@@ -40,25 +40,32 @@ export const useAuth = () => {
   });
 
   const loadSessionAndProfile = useCallback(async (currentSession: Session | null) => {
+    console.log('Auth: Resolving session and profile...');
     if (currentSession) {
       const profile = await fetchProfile(currentSession.user.id);
       setAuthState({ session: currentSession, profile, loading: false });
+      console.log('Auth: Session found. Loading set to false.');
     } else {
       setAuthState({ session: null, profile: null, loading: false });
+      console.log('Auth: No session found. Loading set to false.');
     }
   }, []);
 
   useEffect(() => {
+    console.log('Auth: Initializing listener and session check.');
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth Event:', event);
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         await loadSessionAndProfile(session);
       } else if (event === 'SIGNED_OUT') {
         setAuthState({ session: null, profile: null, loading: false });
+        console.log('Auth: SIGNED_OUT. Loading set to false.');
       }
     });
 
     // Initial check
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Auth: Initial getSession result.');
       loadSessionAndProfile(session);
     });
 

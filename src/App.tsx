@@ -2,7 +2,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'sonner'; // Importando Toaster do sonner
 import { SessionContextProvider } from '@/integrations/supabase/session-context';
 import ProtectedRoute from './components/protected-route';
-import Index from './pages/Index';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
@@ -20,11 +19,12 @@ function App() {
       <Router>
         <Routes>
           {/* Rotas Públicas */}
-          <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
 
           {/* Rotas Protegidas */}
           <Route element={<ProtectedRoute />}>
+            {/* A rota raiz agora aponta para o dashboard se autenticado */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/produtos" element={<Products />} />
             <Route path="/adicionar-produto" element={<AddEditProduct />} />

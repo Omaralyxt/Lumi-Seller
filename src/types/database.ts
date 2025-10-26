@@ -42,6 +42,7 @@ export interface Order {
   payment_method: string | null; // Novo campo
   created_at: string;
   order_number: string | null;
+  mpesa_transaction_id: string | null;
 }
 
 // Tipagem para OrderItem

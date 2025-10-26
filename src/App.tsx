@@ -12,6 +12,7 @@ import AddEditProduct from './pages/AddEditProduct';
 import OrderDetail from './pages/OrderDetail';
 import StoreSetup from './pages/StoreSetup';
 import Notifications from './pages/Notifications';
+import NotFound from './pages/NotFound'; // Importando NotFound
 
 function App() {
   return (
@@ -34,8 +35,8 @@ function App() {
             <Route path="/notifications" element={<Notifications />} />
           </Route>
 
-          {/* Redirecionamento padrão para login se a rota não for encontrada e não estiver autenticado */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* Rota 404 - Captura qualquer rota não definida */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>
       <Toaster />

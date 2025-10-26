@@ -29,6 +29,8 @@ export interface ProductVariant {
   price: number; // Em Metical (MZN)
   stock: number;
   created_at: string;
+  // Adicionando imagens para a variante (para o frontend)
+  images?: ProductImage[]; 
 }
 
 // Tipagem para Order

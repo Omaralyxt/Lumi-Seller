@@ -14,7 +14,6 @@ import { Order, OrderItem, Customer } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
-import MpesaPaymentForm from "@/components/MpesaPaymentForm"; // Importando o novo componente
 
 // Componente para gerenciar o código de rastreio
 const TrackingCodeManager = ({ orderId, initialCode, isUpdating, onUpdate }: { orderId: string, initialCode: string | null, isUpdating: boolean, onUpdate: (code: string | null) => void }) => {
@@ -192,11 +191,6 @@ const OrderDetail = () => {
     updateStatusMutation.mutate({ newStatus });
   };
   
-  // Função para invalidar o pedido após a tentativa de pagamento (seja sucesso ou falha)
-  const handlePaymentInitiated = () => {
-    queryClient.invalidateQueries({ queryKey: ['order', orderId] });
-  };
-
   const handleUpdateTrackingCode = (code: string | null) => {
     updateStatusMutation.mutate({ trackingCode: code });
   };
@@ -246,12 +240,13 @@ const OrderDetail = () => {
   // Garante que o frete não seja negativo, embora o total_amount deva ser >= subtotal
   const shippingCost = Math.max(0, order.total_amount - subtotal); 
 
-  const customerName = customer?.full_name || 'Cliente Não Encontrado';
-  const customerEmail = customer?.email || 'N/A';
-  const customerPhone = customer?.phone || 'N/A';
+  const customerName = order.buyer_name || 'Cliente Não Encontrado';
+  const customerEmail = order.buyer_email || 'N/A';
+  const customerPhone = order.buyer_phone || 'N/A';
   
-  const shippingAddress = customer ? 
-    `${customer.shipping_address}\n${customer.city} - ${customer.state}, ${customer.zip_code}` : 
+  // Usando os dados de endereço do pedido, já que o customer_id pode ser nulo ou o customer pode não ter todos os campos
+  const shippingAddress = order.buyer_address && order.buyer_city && order.buyer_country ? 
+    `${order.buyer_address}\n${order.buyer_city}, ${order.buyer_country}` : 
     'Endereço de envio não disponível.';
 
   const isUpdating = updateStatusMutation.isPending;
@@ -304,16 +299,6 @@ const OrderDetail = () => {
             </CardContent>
           </Card>
           
-          {/* Formulário de Pagamento M-Pesa (Apenas se o status for pendente e o método for M-Pesa) */}
-          {(order.status === 'pending' || order.status === 'processing') && order.payment_method === 'M-Pesa' && (
-            <MpesaPaymentForm 
-              orderId={order.id}
-              orderNumber={order.order_number || order.id}
-              amount={order.total_amount}
-              onPaymentInitiated={handlePaymentInitiated}
-            />
-          )}
-
           {/* Ações de Status */}
           <Card className="rounded-xl">
             <CardHeader>
@@ -387,7 +372,7 @@ const OrderDetail = () => {
             />
           )}
 
-          {/* Detalhes do Cliente */}
+          {/* Detalhes do Cliente (Usando dados do pedido, já que o customer_id pode ser complexo) */}
           <Card className="rounded-xl">
             <CardHeader>
               <CardTitle className="font-heading text-xl flex items-center"><User className="h-5 w-5 mr-2" /> Detalhes do Comprador</CardTitle>
@@ -447,11 +432,6 @@ const OrderDetail = () => {
               <p className="mt-2 text-sm font-bold text-primary">
                 Status de Envio: {order.status === 'shipped' ? 'Enviado' : order.status === 'delivered' ? 'Entregue' : 'Aguardando Envio'}
               </p>
-              {order.mpesa_transaction_id && (
-                <p className="mt-2 text-sm font-bold text-green-600">
-                  ID Transação M-Pesa: <span className="font-medium text-foreground">{order.mpesa_transaction_id}</span>
-                </p>
-              )}
             </CardContent>
           </Card>
         </div>

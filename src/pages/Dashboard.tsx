@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, DollarSign, Store, PlusCircle, Settings as SettingsIcon, Eye, Loader2, ShoppingCart, Zap } from "lucide-react";
+import { Package, DollarSign, Store, PlusCircle, Settings as SettingsIcon, Eye, Loader2, ShoppingCart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -12,8 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { usePageTitle } from "@/hooks/use-page-title";
 import EmptyState from "@/components/EmptyState";
 import { Order } from "@/types/database";
-import { createTestOrder } from "@/integrations/supabase/orders"; // Importando a função de teste
-import { useState } from "react";
 import { useOrdersRealtime } from "@/hooks/use-orders-realtime"; // Importando o hook de Realtime
 
 // Função para buscar métricas do dashboard
@@ -95,7 +93,6 @@ const Dashboard = () => {
   usePageTitle("Dashboard");
   const { profile } = useAuth();
   const { store, loading: storeLoading } = useStore();
-  const [isCreatingTestOrder, setIsCreatingTestOrder] = useState(false);
   
   // Ativa o listener Realtime para novos pedidos
   useOrdersRealtime(); 
@@ -103,30 +100,17 @@ const Dashboard = () => {
   // Habilita as queries somente se a loja estiver carregada e não estiver em estado de carregamento inicial
   const enabled = !!store && !storeLoading;
 
-  const { data: metrics, isLoading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useQuery({
+  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useQuery({
     queryKey: ['dashboardMetrics', store?.id],
     queryFn: () => fetchDashboardMetrics(store!.id),
     enabled: enabled,
   });
 
-  const { data: recentOrders, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
+  const { data: recentOrders, isLoading: ordersLoading, error: ordersError } = useQuery({
     queryKey: ['recentOrders', store?.id],
     queryFn: () => fetchRecentOrders(store!.id),
     enabled: enabled,
   });
-
-  const handleCreateTestOrder = async () => {
-    if (!store || !profile) return;
-    setIsCreatingTestOrder(true);
-    try {
-      await createTestOrder(store.id, profile.id);
-      // O Realtime deve invalidar as queries, mas forçamos o refetch para garantir
-      refetchMetrics();
-      refetchOrders();
-    } finally {
-      setIsCreatingTestOrder(false);
-    }
-  };
 
   if (storeLoading || metricsLoading || ordersLoading) {
     return (
@@ -175,18 +159,6 @@ const Dashboard = () => {
             <SettingsIcon className="mr-2 h-5 w-5" /> Gerir Loja
           </Button>
         </Link>
-        <Button 
-          onClick={handleCreateTestOrder} 
-          disabled={isCreatingTestOrder}
-          className="flex-1 min-w-[150px] py-6 text-lg font-heading rounded-xl bg-green-600 hover:bg-green-700"
-        >
-          {isCreatingTestOrder ? (
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          ) : (
-            <Zap className="mr-2 h-5 w-5" />
-          )}
-          {isCreatingTestOrder ? 'Criando...' : 'Criar Pedido de Teste'}
-        </Button>
       </div>
 
       {/* Metrics Cards */}

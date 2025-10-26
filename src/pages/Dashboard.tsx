@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, DollarSign, Store, PlusCircle, Settings as SettingsIcon, Eye, Loader2, ShoppingCart } from "lucide-react";
+import { Package, DollarSign, Store, PlusCircle, Settings as SettingsIcon, Eye, Loader2, ShoppingCart, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { usePageTitle } from "@/hooks/use-page-title";
 import EmptyState from "@/components/EmptyState";
-import { Order } from "@/types/database"; // Importando Order do novo arquivo de tipagem
+import { Order } from "@/types/database";
+import { createTestOrder } from "@/integrations/supabase/orders"; // Importando a função de teste
+import { useState } from "react";
 
 // Função para buscar métricas do dashboard
 const fetchDashboardMetrics = async (storeId: string) => {
@@ -92,21 +94,35 @@ const Dashboard = () => {
   usePageTitle("Dashboard");
   const { profile } = useAuth();
   const { store, loading: storeLoading } = useStore();
+  const [isCreatingTestOrder, setIsCreatingTestOrder] = useState(false);
   
   // Habilita as queries somente se a loja estiver carregada e não estiver em estado de carregamento inicial
   const enabled = !!store && !storeLoading;
 
-  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useQuery({
+  const { data: metrics, isLoading: metricsLoading, error: metricsError, refetch: refetchMetrics } = useQuery({
     queryKey: ['dashboardMetrics', store?.id],
     queryFn: () => fetchDashboardMetrics(store!.id),
     enabled: enabled,
   });
 
-  const { data: recentOrders, isLoading: ordersLoading, error: ordersError } = useQuery({
+  const { data: recentOrders, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
     queryKey: ['recentOrders', store?.id],
     queryFn: () => fetchRecentOrders(store!.id),
     enabled: enabled,
   });
+
+  const handleCreateTestOrder = async () => {
+    if (!store || !profile) return;
+    setIsCreatingTestOrder(true);
+    try {
+      await createTestOrder(store.id, profile.id);
+      // O Realtime deve invalidar as queries, mas forçamos o refetch para garantir
+      refetchMetrics();
+      refetchOrders();
+    } finally {
+      setIsCreatingTestOrder(false);
+    }
+  };
 
   if (storeLoading || metricsLoading || ordersLoading) {
     return (
@@ -133,7 +149,7 @@ const Dashboard = () => {
   const { balance, productCount, pendingOrders } = metrics || { balance: 0, productCount: 0, pendingOrders: 0 };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8 font-sans">
+    <div className="min-h-screen bg-background p-4 md:p-8 font-sans max-w-6xl mx-auto">
       <header className="mb-8">
         <h1 className="text-4xl font-heading font-bold text-primary mb-2">Lumi Seller</h1>
         <p className="text-2xl font-heading text-foreground">{storeName} Dashboard</p>
@@ -155,6 +171,18 @@ const Dashboard = () => {
             <SettingsIcon className="mr-2 h-5 w-5" /> Gerir Loja
           </Button>
         </Link>
+        <Button 
+          onClick={handleCreateTestOrder} 
+          disabled={isCreatingTestOrder}
+          className="flex-1 min-w-[150px] py-6 text-lg font-heading rounded-xl bg-green-600 hover:bg-green-700"
+        >
+          {isCreatingTestOrder ? (
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          ) : (
+            <Zap className="mr-2 h-5 w-5" />
+          )}
+          {isCreatingTestOrder ? 'Criando...' : 'Criar Pedido de Teste'}
+        </Button>
       </div>
 
       {/* Metrics Cards */}

@@ -1,91 +1,46 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
-import Products from "./pages/Products"; // Renamed from Index
-import Login from "./pages/Login";
-import NotFound from "./pages/NotFound";
-import Dashboard from "./pages/Dashboard";
-import AddEditProduct from "./pages/AddEditProduct";
-import Orders from "./pages/Orders";
-import Settings from "./pages/Settings";
-import OrderDetail from "./pages/OrderDetail"; // Importando OrderDetail
-import { useAuth } from "@/hooks/use-auth";
-import { MadeWithDyad } from "@/components/made-with-dyad";
-import Layout from "./components/Layout"; // Importando o novo Layout
-import LoadingSpinner from "./components/LoadingSpinner"; // Importando LoadingSpinner
-import { supabase } from "@/integrations/supabase/client";
-import { useEffect } from "react";
-import { useOrdersRealtime } from "./hooks/use-orders-realtime"; // Importando o novo hook
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { SessionContextProvider } from './integrations/supabase/session-context';
+import ProtectedRoute from './components/protected-route';
+import Index from './pages/Index';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Products from './pages/Products';
+import Orders from './pages/Orders';
+import Settings from './pages/Settings';
+import ProductDetail from './pages/ProductDetail';
+import OrderDetail from './pages/OrderDetail';
+import StoreSetup from './pages/StoreSetup';
+import Notifications from './pages/Notifications';
 
-const queryClient = new QueryClient();
-
-// Componente para proteger rotas e aplicar o layout
-const ProtectedLayout = () => {
-  const { session, loading, profile } = useAuth();
-  useOrdersRealtime(); // Ativa o listener Realtime aqui
-
-  // 4. Bloquear acessos indevidos (Lumi Seller)
-  useEffect(() => {
-    if (!loading && profile && profile.role !== 'seller') {
-      alert("Acesso restrito a vendedores. Você será desconectado.");
-      supabase.auth.signOut();
-    }
-  }, [loading, profile]);
-
-  if (loading) {
-    // Usando o novo LoadingSpinner
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner size={48} />
-      </div>
-    );
-  }
-
-  if (!session || (profile && profile.role !== 'seller')) {
-    // Se não houver sessão OU se o perfil for carregado e não for 'seller', redireciona para login.
-    // O useEffect acima já cuida do logout, mas o Navigate garante o redirecionamento imediato.
-    return <Navigate to="/login" replace />;
-  }
-
+function App() {
   return (
-    <Layout>
-      <Outlet />
-    </Layout>
-  );
-};
+    <SessionContextProvider>
+      <Router>
+        <Routes>
+          {/* Rotas Públicas */}
+          <Route path="/" element={<Index />} />
+          <Route path="/login" element={<Login />} />
 
-const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Public Route */}
-            <Route path="/login" element={<Login />} />
+          {/* Rotas Protegidas */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/orders/:id" element={<OrderDetail />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/store-setup" element={<StoreSetup />} />
+            <Route path="/notifications" element={<Notifications />} />
+          </Route>
 
-            {/* Protected Routes Grouped under ProtectedLayout */}
-            <Route element={<ProtectedLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/adicionar-produto" element={<AddEditProduct />} />
-              <Route path="/produtos" element={<Products />} />
-              <Route path="/pedidos" element={<Orders />} />
-              <Route path="/pedidos/:id" element={<OrderDetail />} /> {/* Nova Rota */}
-              <Route path="/configuracoes" element={<Settings />} />
-            </Route>
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-        <MadeWithDyad />
-      </TooltipProvider>
-    </QueryClientProvider>
+          {/* Redirecionamento padrão para login se a rota não for encontrada e não estiver autenticado */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
+      <Toaster />
+    </SessionContextProvider>
   );
-};
+}
 
 export default App;

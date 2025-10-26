@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { SessionContextProvider } from '@/integrations/supabase/session-context';
-import ProtectedRoute from './components/protected-route';
+import ProtectedRoute from './components/ProtectedRoute';
 import Index from './pages/Index';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';

@@ -39,41 +39,6 @@ export const useAuth = () => {
     loading: true,
   });
 
-  const loadSessionAndProfile = useCallback(async (currentSession: Session | null) => {
-    console.log('Auth: Resolving session and profile...');
-    if (currentSession) {
-      const profile = await fetchProfile(currentSession.user.id);
-      setAuthState({ session: currentSession, profile, loading: false });
-      console.log('Auth: Session found. Loading set to false.');
-    } else {
-      setAuthState({ session: null, profile: null, loading: false });
-      console.log('Auth: No session found. Loading set to false.');
-    }
-  }, []);
-
-  useEffect(() => {
-    console.log('Auth: Initializing listener and session check.');
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth Event:', event);
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        await loadSessionAndProfile(session);
-      } else if (event === 'SIGNED_OUT') {
-        setAuthState({ session: null, profile: null, loading: false });
-        console.log('Auth: SIGNED_OUT. Loading set to false.');
-      }
-    });
-
-    // Initial check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Auth: Initial getSession result.');
-      loadSessionAndProfile(session);
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [loadSessionAndProfile]);
-
   const updateProfile = async (updates: Partial<Omit<Profile, 'id' | 'role'>>): Promise<boolean> => {
     if (!authState.profile) {
       showError("Usuário não autenticado.");
@@ -102,6 +67,48 @@ export const useAuth = () => {
     }
     return false;
   };
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const resolveAuth = async (session: Session | null) => {
+      if (!isMounted) return;
+      
+      let profile: Profile | null = null;
+      if (session) {
+        profile = await fetchProfile(session.user.id);
+      }
+      
+      if (isMounted) {
+        setAuthState({ session, profile, loading: false });
+        console.log('Auth: Session resolved. Loading set to false.');
+      }
+    };
+
+    // 1. Configurar o listener de mudanças de estado
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth Event:', event);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        resolveAuth(session);
+      } else if (event === 'SIGNED_OUT') {
+        if (isMounted) {
+          setAuthState({ session: null, profile: null, loading: false });
+          console.log('Auth: SIGNED_OUT. Loading set to false.');
+        }
+      }
+    });
+
+    // 2. Verificação inicial da sessão
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Auth: Initial getSession result.');
+      resolveAuth(session);
+    });
+
+    return () => {
+      isMounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []); // Dependências vazias garantem que a inicialização ocorra apenas uma vez
 
   return { ...authState, updateProfile };
 };

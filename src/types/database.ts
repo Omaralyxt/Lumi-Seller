@@ -41,6 +41,8 @@ export interface Order {
   tracking_code: string | null; // Novo campo
   payment_method: string | null; // Novo campo
   created_at: string;
+  order_number: string | null;
+  mpesa_transaction_id: string | null;
 }
 
 // Tipagem para OrderItem
@@ -61,4 +63,16 @@ export interface Customer {
   city: string;
   state: string;
   zip_code: string;
+}
+
+// Tipagem para Notification
+export interface Notification {
+  id: string;
+  store_id: string | null;
+  order_id: string | null;
+  type: 'new_order' | 'status_update' | 'system';
+  title: string;
+  message: string;
+  created_at: string;
+  is_read: boolean;
 }

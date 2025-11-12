@@ -51,7 +51,7 @@ export interface OrderItem {
   id: string;
   product_name: string;
   quantity: number;
-  price_at_purchase: number;
+  price: number; // Corrigido de price_at_purchase para price
 }
 
 // Tipagem para Customer

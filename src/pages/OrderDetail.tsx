@@ -104,7 +104,7 @@ const OrderDetail = () => {
 
     const { data, error } = await supabase
       .from('order_items')
-      .select('id, product_name, quantity, price_at_purchase')
+      .select('id, product_name, quantity, price') // Corrigido para 'price'
       .eq('order_id', orderId)
       .eq('store_id', store.id);
 
@@ -114,7 +114,7 @@ const OrderDetail = () => {
 
     return data.map(item => ({
       ...item,
-      price_at_purchase: parseFloat(item.price_at_purchase as unknown as string),
+      price: parseFloat(item.price as unknown as string), // Corrigido para 'price'
     })) as OrderItem[];
   };
 
@@ -236,7 +236,7 @@ const OrderDetail = () => {
     return <div className="p-8 text-center text-muted-foreground">Pedido não encontrado ou você não tem permissão para visualizá-lo.</div>;
   }
 
-  const subtotal = items?.reduce((sum, item) => sum + (item.price_at_purchase * item.quantity), 0) || 0;
+  const subtotal = items?.reduce((sum, item) => sum + (item.price * item.quantity), 0) || 0; // Corrigido para item.price
   // Garante que o frete não seja negativo, embora o total_amount deva ser >= subtotal
   const shippingCost = Math.max(0, order.total_amount - subtotal); 
 
@@ -405,10 +405,10 @@ const OrderDetail = () => {
                       <div className="flex flex-col">
                         <span className="font-medium">{item.product_name}</span>
                         <span className="text-sm text-muted-foreground">
-                          Qtd: {item.quantity} @ MZN {item.price_at_purchase.toFixed(2)}
+                          Qtd: {item.quantity} @ MZN {item.price.toFixed(2)}
                         </span>
                       </div>
-                      <span className="font-bold text-primary">MZN {(item.price_at_purchase * item.quantity).toFixed(2)}</span>
+                      <span className="font-bold text-primary">MZN {(item.price * item.quantity).toFixed(2)}</span>
                     </li>
                   ))}
                 </ul>

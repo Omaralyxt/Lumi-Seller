@@ -3,9 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List, Video, Tag, FileText } from "lucide-react";
+import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List, Video, Tag, FileText, Power } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useForm } from "react-hook-form";
+import { useForm } from "@/components/ui/form"; // Importação corrigida
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useStore } from "@/hooks/use-store";
@@ -25,7 +25,8 @@ import { PRODUCT_CATEGORIES } from "@/lib/categories";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import SpecificationManager from "@/components/SpecificationManager";
-import DetailedDescriptionManager from "@/components/DetailedDescriptionManager"; // Importação do novo componente
+import DetailedDescriptionManager from "@/components/DetailedDescriptionManager";
+import { Switch } from "@/components/ui/switch"; // Importando Switch
 
 // Esquema de Validação
 const productSchema = z.object({
@@ -35,6 +36,7 @@ const productSchema = z.object({
   shipping_cost: z.coerce.number().min(0).nullable(),
   category: z.string().min(1, "A categoria é obrigatória."),
   video_url: z.string().url("Deve ser uma URL válida.").nullable().or(z.literal("")),
+  is_active: z.boolean().default(true), // Novo campo
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -168,6 +170,7 @@ const AddEditProduct = () => {
       shipping_cost: 0,
       category: "",
       video_url: "",
+      is_active: true, // Padrão para novo produto
     },
   });
 
@@ -200,6 +203,7 @@ const AddEditProduct = () => {
             shipping_cost: productData.shipping_cost ? parseFloat(productData.shipping_cost as unknown as string) : 0,
             category: productData.category || "",
             video_url: productData.video_url || "",
+            is_active: productData.is_active ?? true, // Carrega o estado de ativação
           });
           
           // Carregar Especificações
@@ -392,7 +396,8 @@ const AddEditProduct = () => {
         p_images: allImagesForSP,
         p_specifications: activeSpecifications,
         p_video_url: values.video_url || null,
-        p_detailed_images: detailedImages, // Passando imagens detalhadas
+        p_detailed_images: detailedImages,
+        p_is_active: values.is_active, // Passando o estado de ativação
       });
 
       if (spError) {
@@ -446,6 +451,27 @@ const AddEditProduct = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            
+            {/* Status de Ativação */}
+            <div className="flex items-center justify-between p-4 border border-border rounded-xl bg-muted/20">
+                <div className="flex items-center space-x-3">
+                    <Power className={cn("h-5 w-5", form.watch("is_active") ? "text-green-500" : "text-red-500")} />
+                    <Label htmlFor="is_active" className="text-base font-heading">
+                        Status do Produto
+                    </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <span className="text-sm text-muted-foreground">
+                        {form.watch("is_active") ? "Ativo (Visível na Loja)" : "Inativo (Oculto)"}
+                    </span>
+                    <Switch
+                        id="is_active"
+                        checked={form.watch("is_active")}
+                        onCheckedChange={(checked) => form.setValue("is_active", checked)}
+                        disabled={isSubmitting}
+                    />
+                </div>
+            </div>
             
             {/* Nome e Descrição */}
             <div className="grid gap-2">
@@ -506,7 +532,7 @@ const AddEditProduct = () => {
                   id="shipping" 
                   type="number" 
                   step="0.01" 
-                  placeholder="15.00" 
+                  placeholder="0.00" 
                   className="font-sans rounded-lg" 
                   {...form.register("shipping_cost", { valueAsNumber: true })}
                 />

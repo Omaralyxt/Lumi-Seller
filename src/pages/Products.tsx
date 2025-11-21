@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, PlusCircle, Edit, Trash2, Loader2, Tag } from "lucide-react";
+import { Package, PlusCircle, Edit, Trash2, Loader2, Tag, Power } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/hooks/use-store";
@@ -12,13 +12,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
 import EmptyState from "@/components/EmptyState";
 import { Product } from "@/types/database";
+import { Badge } from "@/components/ui/badge";
 
 // Tipagem do Produto (simplificada para a listagem)
-interface ProductListItem extends Omit<Product, 'shipping_cost' | 'description' | 'category' | 'specifications' | 'video_url'> {
+interface ProductListItem extends Omit<Product, 'shipping_cost' | 'description' | 'category' | 'specifications' | 'video_url' | 'detailed_images'> {
   min_price: number;
   min_cut_price: number | null; // Novo campo para o menor preço de corte
   total_stock: number;
   image_url: string | null; // Adicionado de volta para a listagem, mas vindo da tabela de imagens
+  is_active: boolean; // Adicionado
 }
 
 const Products = () => {
@@ -37,6 +39,7 @@ const Products = () => {
         id, 
         name, 
         created_at,
+        is_active,
         product_variants (price, stock, cut_price),
         product_images (image_url, sort_order)
       `)
@@ -81,6 +84,7 @@ const Products = () => {
         min_price: minPrice === Infinity ? 0 : minPrice,
         min_cut_price: minCutPrice,
         total_stock: totalStock,
+        is_active: p.is_active,
       } as ProductListItem;
     });
   };
@@ -132,11 +136,36 @@ const Products = () => {
       showError(`Erro ao excluir produto: ${err.message}`);
     },
   });
+  
+  // Mutação para alternar o status de ativação
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ productId, isActive }: { productId: string, isActive: boolean }) => {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_active: isActive })
+        .eq('id', productId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: (_, variables) => {
+      showSuccess(`Produto ${variables.isActive ? 'ativado' : 'desativado'} com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (err) => {
+      showError(`Erro ao alternar status: ${err.message}`);
+    },
+  });
 
   const handleDelete = (product: ProductListItem) => {
     if (window.confirm(`Tem certeza que deseja excluir o produto "${product.name}"? Isso removerá todas as variantes e imagens.`)) {
       deleteMutation.mutate(product);
     }
+  };
+  
+  const handleToggleActive = (product: ProductListItem) => {
+    toggleActiveMutation.mutate({ productId: product.id, isActive: !product.is_active });
   };
 
   if (storeLoading || isLoading) {
@@ -187,7 +216,17 @@ const Products = () => {
               />
               <div className="flex-1 min-w-0">
                 <CardTitle className="text-lg font-heading truncate">{product.name}</CardTitle>
-                <p className="text-sm text-muted-foreground font-sans">Estoque Total: {product.total_stock}</p>
+                <div className="flex items-center space-x-2 mt-1">
+                    <p className="text-sm text-muted-foreground font-sans">Estoque Total: {product.total_stock}</p>
+                    <Badge 
+                        className={cn(
+                            "text-xs font-sans",
+                            product.is_active ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
+                        )}
+                    >
+                        {product.is_active ? "ATIVO" : "INATIVO"}
+                    </Badge>
+                </div>
               </div>
               <div className="text-right mr-4">
                 {product.min_cut_price && product.min_cut_price > product.min_price ? (
@@ -203,6 +242,16 @@ const Products = () => {
                 <p className="text-xs text-muted-foreground font-sans">Preço Inicial</p>
               </div>
               <div className="flex space-x-2">
+                <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className={cn("rounded-xl", product.is_active ? "text-red-500 hover:bg-red-500/10" : "text-green-500 hover:bg-green-500/10")}
+                    onClick={() => handleToggleActive(product)}
+                    disabled={toggleActiveMutation.isPending}
+                    title={product.is_active ? "Desativar Produto" : "Ativar Produto"}
+                >
+                    {toggleActiveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
+                </Button>
                 <Link to={`/adicionar-produto?id=${product.id}`}>
                   <Button variant="outline" size="icon" className="rounded-xl">
                     <Edit className="h-4 w-4" />

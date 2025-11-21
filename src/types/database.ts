@@ -32,6 +32,7 @@ export interface Product {
   specifications: Specification[] | null; // Novo campo JSONB
   video_url: string | null; // Novo campo para URL do vídeo
   detailed_images: DetailedImage[] | null; // Novo campo JSONB para imagens de descrição
+  is_active: boolean; // Novo campo para status de ativação
   created_at: string;
 }
 

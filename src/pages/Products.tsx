@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, PlusCircle, Edit, Trash2, Loader2 } from "lucide-react";
+import { Package, PlusCircle, Edit, Trash2, Loader2, Tag } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/hooks/use-store";
@@ -14,8 +14,9 @@ import EmptyState from "@/components/EmptyState";
 import { Product } from "@/types/database";
 
 // Tipagem do Produto (simplificada para a listagem)
-interface ProductListItem extends Omit<Product, 'shipping_cost' | 'description' | 'category'> {
+interface ProductListItem extends Omit<Product, 'shipping_cost' | 'description' | 'category' | 'specifications' | 'video_url'> {
   min_price: number;
+  min_cut_price: number | null; // Novo campo para o menor preço de corte
   total_stock: number;
   image_url: string | null; // Adicionado de volta para a listagem, mas vindo da tabela de imagens
 }
@@ -29,14 +30,14 @@ const Products = () => {
   const fetchProducts = async (): Promise<ProductListItem[]> => {
     if (!store) return [];
     
-    // Busca produtos, variantes e a primeira imagem (ordenada por sort_order)
+    // Busca produtos, variantes (incluindo cut_price) e a primeira imagem
     const { data, error } = await supabase
       .from('products')
       .select(`
         id, 
         name, 
         created_at,
-        product_variants (price, stock),
+        product_variants (price, stock, cut_price),
         product_images (image_url, sort_order)
       `)
       .eq('store_id', store.id)
@@ -47,17 +48,27 @@ const Products = () => {
     }
     
     return data.map(p => {
-      const variants = p.product_variants as { price: string, stock: number }[];
+      const variants = p.product_variants as { price: string, stock: number, cut_price: string | null }[];
       const images = p.product_images as { image_url: string, sort_order: number }[];
       
-      let minPrice = 0;
+      let minPrice = Infinity;
+      let minCutPrice: number | null = null;
       let totalStock = 0;
 
       if (variants && variants.length > 0) {
         // Converte preços e calcula estoque total
         const prices = variants.map(v => parseFloat(v.price as unknown as string));
+        const cutPrices = variants
+            .map(v => v.cut_price ? parseFloat(v.cut_price as unknown as string) : null)
+            .filter((p): p is number => p !== null && p > prices[variants.findIndex(v => parseFloat(v.price as unknown as string) === Math.min(...prices))]); // Filtra apenas cut_prices válidos e maiores que o preço atual
+        
         minPrice = Math.min(...prices);
         totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
+        
+        if (cutPrices.length > 0) {
+            // Se houver preços de corte válidos, pega o menor deles
+            minCutPrice = Math.min(...cutPrices);
+        }
       }
       
       // Encontra a imagem principal (sort_order 0 ou a primeira)
@@ -67,7 +78,8 @@ const Products = () => {
         id: p.id,
         name: p.name,
         image_url: primaryImage,
-        min_price: minPrice,
+        min_price: minPrice === Infinity ? 0 : minPrice,
+        min_cut_price: minCutPrice,
         total_stock: totalStock,
       } as ProductListItem;
     });
@@ -178,7 +190,16 @@ const Products = () => {
                 <p className="text-sm text-muted-foreground font-sans">Estoque Total: {product.total_stock}</p>
               </div>
               <div className="text-right mr-4">
-                <p className="text-lg font-bold font-heading text-primary">MZN {product.min_price.toFixed(2)}</p>
+                {product.min_cut_price && product.min_cut_price > product.min_price ? (
+                    <>
+                        <p className="text-xs text-muted-foreground font-sans line-through">MZN {product.min_cut_price.toFixed(2)}</p>
+                        <p className="text-lg font-bold font-heading text-red-500 flex items-center justify-end">
+                            <Tag className="h-4 w-4 mr-1" /> MZN {product.min_price.toFixed(2)}
+                        </p>
+                    </>
+                ) : (
+                    <p className="text-lg font-bold font-heading text-primary">MZN {product.min_price.toFixed(2)}</p>
+                )}
                 <p className="text-xs text-muted-foreground font-sans">Preço Inicial</p>
               </div>
               <div className="flex space-x-2">

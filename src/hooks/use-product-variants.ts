@@ -18,6 +18,7 @@ export interface FormVariant {
   name: string;
   price: number;
   stock: number;
+  cut_price: number | null; // Adicionado cut_price
   isNew: boolean; // Indica se a variante precisa ser inserida (true) ou atualizada (false)
   images: FormImage[]; // Lista de imagens específicas desta variante
 }
@@ -29,6 +30,7 @@ export const useProductVariants = (initialVariants: ProductVariant[] = []) => {
     initialVariants.map(v => ({
       ...v,
       isNew: false,
+      cut_price: v.cut_price || null, // Inicializa cut_price
       // Mapeia as imagens existentes para o formato FormImage
       images: v.images?.map(img => ({
         id: img.id,
@@ -49,6 +51,7 @@ export const useProductVariants = (initialVariants: ProductVariant[] = []) => {
         name: '',
         price: 0,
         stock: 0,
+        cut_price: null, // Novo campo
         isNew: true,
         images: [], // Nova variante começa sem imagens
       },

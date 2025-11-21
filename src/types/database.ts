@@ -36,6 +36,7 @@ export interface ProductVariant {
   name: string; // Ex: "Tamanho P, Cor Azul"
   price: number; // Em Metical (MZN)
   stock: number;
+  cut_price: number | null; // Novo campo para preço de corte/promoção
   created_at: string;
   // Adicionando imagens para a variante (para o frontend)
   images?: ProductImage[]; 

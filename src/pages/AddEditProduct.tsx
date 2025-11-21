@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List, Video } from "lucide-react";
+import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List, Video, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -211,6 +211,7 @@ const AddEditProduct = () => {
           const loadedVariants = (productData.product_variants || []).map((v: any) => ({
             ...v,
             price: parseFloat(v.price as unknown as string),
+            cut_price: v.cut_price ? parseFloat(v.cut_price as unknown as string) : null, // Carregar cut_price
           })) as ProductVariant[];
           
           // 3. Carregar Imagens (Temporariamente, todas as imagens do produto vão para a primeira variante)
@@ -222,6 +223,7 @@ const AddEditProduct = () => {
               name: v.name,
               price: v.price,
               stock: v.stock,
+              cut_price: v.cut_price || null, // Incluir cut_price
               isNew: false,
               // Apenas a primeira variante recebe as imagens do produto (compatibilidade)
               images: index === 0 ? loadedImages.map(img => ({
@@ -267,11 +269,20 @@ const AddEditProduct = () => {
         const activeImages = v.images.filter(img => !img.isDeleted);
         totalActiveImages += activeImages.length;
         
+        // Validação de preço de corte: se existir, deve ser maior que o preço atual
+        if (v.cut_price !== null && v.cut_price <= v.price) {
+            showError(`O preço de corte (MZN ${v.cut_price.toFixed(2)}) da variante "${v.name}" deve ser maior que o preço atual (MZN ${v.price.toFixed(2)}).`);
+            return true;
+        }
+        
         return !v.name || v.price <= 0 || v.stock < 0 || activeImages.length === 0;
     });
     
     if (invalidVariant) {
-        showError("Todas as variantes devem ter nome, preço maior que zero, estoque válido E pelo menos uma imagem.");
+        // Se o erro já foi mostrado acima (preço de corte), não mostra este genérico
+        if (!invalidVariant.cut_price || invalidVariant.cut_price <= invalidVariant.price) {
+            showError("Todas as variantes devem ter nome, preço maior que zero, estoque válido E pelo menos uma imagem.");
+        }
         return;
     }
     
@@ -335,6 +346,7 @@ const AddEditProduct = () => {
           name: v.name,
           price: v.price,
           stock: v.stock,
+          cut_price: v.cut_price, // Incluindo cut_price
           images: imagesForDB, // Passamos as imagens junto com a variante
         };
       }));
@@ -534,6 +546,9 @@ const AddEditProduct = () => {
                                     <div className="flex items-center space-x-3">
                                         <span className="font-bold text-foreground">{variant.name || `Nova Variante ${index + 1}`}</span>
                                         <Badge variant="secondary" className="text-xs">Estoque: {variant.stock}</Badge>
+                                        {variant.cut_price && variant.cut_price > variant.price && (
+                                            <Badge className="bg-red-500 hover:bg-red-600 text-white text-xs">Promoção</Badge>
+                                        )}
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         <span className="font-bold text-primary">MZN {variant.price.toFixed(2)}</span>
@@ -557,7 +572,7 @@ const AddEditProduct = () => {
                                         />
                                     </div>
                                     <div className="grid gap-1">
-                                        <Label htmlFor={`variant-price-${variant.id}`} className="text-xs text-muted-foreground">Preço (MZN)</Label>
+                                        <Label htmlFor={`variant-price-${variant.id}`} className="text-xs text-muted-foreground">Preço Atual (MZN)</Label>
                                         <Input 
                                             id={`variant-price-${variant.id}`}
                                             type="number"
@@ -579,6 +594,25 @@ const AddEditProduct = () => {
                                             className="font-sans rounded-lg"
                                         />
                                     </div>
+                                </div>
+                                
+                                {/* Novo Campo: Preço de Corte */}
+                                <div className="grid gap-1">
+                                    <Label htmlFor={`variant-cut-price-${variant.id}`} className="text-xs text-muted-foreground flex items-center">
+                                        <Tag className="h-3 w-3 mr-1" /> Preço de Corte (MZN - Opcional)
+                                    </Label>
+                                    <Input 
+                                        id={`variant-cut-price-${variant.id}`}
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="150.00 (Preço Antigo)"
+                                        value={variant.cut_price || ''}
+                                        onChange={(e) => updateVariant(variant.id, { cut_price: parseFloat(e.target.value) || null })}
+                                        className="font-sans rounded-lg"
+                                    />
+                                    {variant.cut_price && variant.cut_price <= variant.price && (
+                                        <p className="text-destructive text-xs">O preço de corte deve ser maior que o preço atual para indicar desconto.</p>
+                                    )}
                                 </div>
                                 
                                 {/* Gerenciador de Imagens da Variante */}

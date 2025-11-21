@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List } from "lucide-react";
+import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,6 +33,7 @@ const productSchema = z.object({
   description: z.string().nullable(),
   shipping_cost: z.coerce.number().min(0).nullable(),
   category: z.string().min(1, "A categoria é obrigatória."),
+  video_url: z.string().url("Deve ser uma URL válida.").nullable().or(z.literal("")), // Novo campo
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -164,6 +165,7 @@ const AddEditProduct = () => {
       description: "",
       shipping_cost: 0,
       category: "",
+      video_url: "", // Default value for video URL
     },
   });
 
@@ -195,6 +197,7 @@ const AddEditProduct = () => {
             ...productData,
             shipping_cost: productData.shipping_cost ? parseFloat(productData.shipping_cost as unknown as string) : 0,
             category: productData.category || "",
+            video_url: productData.video_url || "", // Carregar URL do vídeo
           });
           
           // Carregar Especificações
@@ -371,6 +374,7 @@ const AddEditProduct = () => {
         p_variants: variantsForSP, // Passando variantes
         p_images: allImagesForSP, // Passando todas as imagens (compatibilidade com a SP atual)
         p_specifications: activeSpecifications, // Passando especificações
+        p_video_url: values.video_url || null, // Passando URL do vídeo
       });
 
       if (spError) {
@@ -489,6 +493,22 @@ const AddEditProduct = () => {
                   {...form.register("shipping_cost", { valueAsNumber: true })}
                 />
               </div>
+            </div>
+            
+            {/* URL do Vídeo */}
+            <div className="grid gap-2">
+              <Label htmlFor="video_url" className="flex items-center">
+                <Video className="h-4 w-4 mr-2 text-muted-foreground" /> URL do Vídeo (Opcional)
+              </Label>
+              <Input 
+                id="video_url" 
+                placeholder="Ex: https://youtube.com/watch?v=..." 
+                className="font-sans rounded-lg" 
+                {...form.register("video_url")}
+              />
+              {form.formState.errors.video_url && (
+                <p className="text-destructive text-sm">{form.formState.errors.video_url.message}</p>
+              )}
             </div>
 
             <Separator />

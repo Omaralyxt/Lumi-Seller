@@ -24,7 +24,7 @@ export interface Product {
   category: string; // Alterado de string | null para string
   shipping_cost: number | null;
   specifications: Specification[] | null; // Novo campo JSONB
-  // image_url: string | null; // Removido, agora está em ProductImage
+  video_url: string | null; // Novo campo para URL do vídeo
   created_at: string;
 }
 

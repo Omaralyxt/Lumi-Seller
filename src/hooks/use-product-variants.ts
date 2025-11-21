@@ -22,7 +22,7 @@ export interface FormVariant {
   images: FormImage[]; // Lista de imagens específicas desta variante
 }
 
-const MAX_IMAGES_PER_VARIANT = 6;
+const MAX_IMAGES_PER_VARIANT = 20;
 
 export const useProductVariants = (initialVariants: ProductVariant[] = []) => {
   const [variants, setVariants] = useState<FormVariant[]>(

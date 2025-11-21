@@ -8,6 +8,13 @@ export interface ProductImage {
   created_at: string;
 }
 
+// Tipagem para Specification
+export interface Specification {
+  id: string; // UUID temporário para o frontend
+  name: string; // Ex: "Peso", "Memória RAM"
+  value: string; // Ex: "200g", "8 GB"
+}
+
 // Tipagem base para Product
 export interface Product {
   id: string;
@@ -16,6 +23,7 @@ export interface Product {
   description: string | null;
   category: string; // Alterado de string | null para string
   shipping_cost: number | null;
+  specifications: Specification[] | null; // Novo campo JSONB
   // image_url: string | null; // Removido, agora está em ProductImage
   created_at: string;
 }

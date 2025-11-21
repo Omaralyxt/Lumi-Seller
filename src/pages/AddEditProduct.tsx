@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,13 +17,14 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Product, ProductVariant, ProductImage } from "@/types/database";
+import { Product, ProductVariant, ProductImage, Specification } from "@/types/database";
 import { useProductVariants, FormVariant, FormImage } from "@/hooks/use-product-variants";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRODUCT_CATEGORIES } from "@/lib/categories";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Badge } from "@/components/ui/badge"; // Importação adicionada
+import { Badge } from "@/components/ui/badge";
+import SpecificationManager from "@/components/SpecificationManager"; // Importação do novo componente
 
 // Esquema de Validação
 const productSchema = z.object({
@@ -151,7 +152,7 @@ const AddEditProduct = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [productLoading, setProductLoading] = useState(!!productId);
   
-  // Removendo estado de imagens do produto
+  const [specifications, setSpecifications] = useState<Specification[]>([]); // Novo estado para especificações
   
   const [initialVariants, setInitialVariants] = useState<ProductVariant[]>([]);
   const { variants, addVariant, updateVariant, removeVariant, setVariants, updateVariantImages, MAX_IMAGES_PER_VARIANT } = useProductVariants(initialVariants);
@@ -171,9 +172,6 @@ const AddEditProduct = () => {
     if (productId && store && !storeLoading) {
       const fetchProductData = async () => {
         // 1. Buscar Produto, Variantes e Imagens
-        // NOTA: O DB ainda associa imagens ao product_id. Vamos buscar todas as imagens do produto
-        // e distribuí-las para a primeira variante para manter a compatibilidade temporária.
-        // No futuro, o SELECT precisará ser ajustado para buscar imagens por variante.
         const { data: productData, error: productError } = await supabase
           .from('products')
           .select(`
@@ -198,6 +196,13 @@ const AddEditProduct = () => {
             shipping_cost: productData.shipping_cost ? parseFloat(productData.shipping_cost as unknown as string) : 0,
             category: productData.category || "",
           });
+          
+          // Carregar Especificações
+          const loadedSpecs = (productData.specifications as Specification[] || []).map(s => ({
+              ...s,
+              id: s.id || uuidv4(), // Garante que cada spec tenha um ID para o frontend
+          }));
+          setSpecifications(loadedSpecs);
           
           // 2. Carregar Variantes
           const loadedVariants = (productData.product_variants || []).map((v: any) => ({
@@ -332,10 +337,6 @@ const AddEditProduct = () => {
       }));
       
       // 2. Chamar a Stored Procedure (Transação Atômica)
-      // NOTA: A stored procedure 'upsert_product_full' atualmente não aceita imagens dentro do array de variantes.
-      // Para manter a funcionalidade, vamos passar todas as imagens ativas do PRODUTO (todas as variantes)
-      // e confiar que a SP as gerencie no nível do produto, como antes.
-      // Esta é uma limitação temporária até que o schema e a SP sejam atualizados para suportar imagens por variante.
       
       // Coletando TODAS as imagens ativas de TODAS as variantes para passar para a SP (compatibilidade)
       const allImagesForSP: { id?: string, image_url: string, sort_order: number, is_deleted: boolean }[] = [];
@@ -357,6 +358,9 @@ const AddEditProduct = () => {
       // Variantes sem o campo 'images' para a SP
       const variantsForSP = variantsForDB.map(({ images, ...rest }) => rest);
       
+      // Filtrar especificações vazias antes de enviar
+      const activeSpecifications = specifications.filter(s => s.name.trim() !== '' && s.value.trim() !== '');
+      
       const { data: spData, error: spError } = await supabase.rpc('upsert_product_full', {
         p_product_id: productId || null,
         p_store_id: store.id,
@@ -366,6 +370,7 @@ const AddEditProduct = () => {
         p_category: values.category,
         p_variants: variantsForSP, // Passando variantes
         p_images: allImagesForSP, // Passando todas as imagens (compatibilidade com a SP atual)
+        p_specifications: activeSpecifications, // Passando especificações
       });
 
       if (spError) {
@@ -487,6 +492,13 @@ const AddEditProduct = () => {
             </div>
 
             <Separator />
+            
+            {/* Gerenciador de Especificações */}
+            <SpecificationManager
+                specifications={specifications}
+                setSpecifications={setSpecifications}
+                isSubmitting={isSubmitting}
+            />
 
             {/* Variantes do Produto */}
             <div className="space-y-4">

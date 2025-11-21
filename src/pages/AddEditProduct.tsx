@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List, Video, Tag } from "lucide-react";
+import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List, Video, Tag, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,14 +17,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Product, ProductVariant, ProductImage, Specification } from "@/types/database";
+import { Product, ProductVariant, ProductImage, Specification, DetailedImage } from "@/types/database";
 import { useProductVariants, FormVariant, FormImage } from "@/hooks/use-product-variants";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PRODUCT_CATEGORIES } from "@/lib/categories";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import SpecificationManager from "@/components/SpecificationManager"; // Importação do novo componente
+import SpecificationManager from "@/components/SpecificationManager";
+import DetailedDescriptionManager from "@/components/DetailedDescriptionManager"; // Importação do novo componente
 
 // Esquema de Validação
 const productSchema = z.object({
@@ -33,7 +34,7 @@ const productSchema = z.object({
   description: z.string().nullable(),
   shipping_cost: z.coerce.number().min(0).nullable(),
   category: z.string().min(1, "A categoria é obrigatória."),
-  video_url: z.string().url("Deve ser uma URL válida.").nullable().or(z.literal("")), // Novo campo
+  video_url: z.string().url("Deve ser uma URL válida.").nullable().or(z.literal("")),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -153,7 +154,8 @@ const AddEditProduct = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [productLoading, setProductLoading] = useState(!!productId);
   
-  const [specifications, setSpecifications] = useState<Specification[]>([]); // Novo estado para especificações
+  const [specifications, setSpecifications] = useState<Specification[]>([]);
+  const [detailedImages, setDetailedImages] = useState<DetailedImage[]>([]); // Novo estado para imagens detalhadas
   
   const [initialVariants, setInitialVariants] = useState<ProductVariant[]>([]);
   const { variants, addVariant, updateVariant, removeVariant, setVariants, updateVariantImages, MAX_IMAGES_PER_VARIANT } = useProductVariants(initialVariants);
@@ -165,7 +167,7 @@ const AddEditProduct = () => {
       description: "",
       shipping_cost: 0,
       category: "",
-      video_url: "", // Default value for video URL
+      video_url: "",
     },
   });
 
@@ -197,21 +199,24 @@ const AddEditProduct = () => {
             ...productData,
             shipping_cost: productData.shipping_cost ? parseFloat(productData.shipping_cost as unknown as string) : 0,
             category: productData.category || "",
-            video_url: productData.video_url || "", // Carregar URL do vídeo
+            video_url: productData.video_url || "",
           });
           
           // Carregar Especificações
           const loadedSpecs = (productData.specifications as Specification[] || []).map(s => ({
               ...s,
-              id: s.id || uuidv4(), // Garante que cada spec tenha um ID para o frontend
+              id: s.id || uuidv4(),
           }));
           setSpecifications(loadedSpecs);
+          
+          // Carregar Imagens Detalhadas
+          setDetailedImages(productData.detailed_images || []);
           
           // 2. Carregar Variantes
           const loadedVariants = (productData.product_variants || []).map((v: any) => ({
             ...v,
             price: parseFloat(v.price as unknown as string),
-            cut_price: v.cut_price ? parseFloat(v.cut_price as unknown as string) : null, // Carregar cut_price
+            cut_price: v.cut_price ? parseFloat(v.cut_price as unknown as string) : null,
           })) as ProductVariant[];
           
           // 3. Carregar Imagens (Temporariamente, todas as imagens do produto vão para a primeira variante)
@@ -223,7 +228,7 @@ const AddEditProduct = () => {
               name: v.name,
               price: v.price,
               stock: v.stock,
-              cut_price: v.cut_price || null, // Incluir cut_price
+              cut_price: v.cut_price || null,
               isNew: false,
               // Apenas a primeira variante recebe as imagens do produto (compatibilidade)
               images: index === 0 ? loadedImages.map(img => ({
@@ -383,10 +388,11 @@ const AddEditProduct = () => {
         p_description: values.description,
         p_shipping_cost: values.shipping_cost,
         p_category: values.category,
-        p_variants: variantsForSP, // Passando variantes
-        p_images: allImagesForSP, // Passando todas as imagens (compatibilidade com a SP atual)
-        p_specifications: activeSpecifications, // Passando especificações
-        p_video_url: values.video_url || null, // Passando URL do vídeo
+        p_variants: variantsForSP,
+        p_images: allImagesForSP,
+        p_specifications: activeSpecifications,
+        p_video_url: values.video_url || null,
+        p_detailed_images: detailedImages, // Passando imagens detalhadas
       });
 
       if (spError) {
@@ -456,7 +462,7 @@ const AddEditProduct = () => {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="description">Descrição</Label>
+              <Label htmlFor="description">Descrição Curta</Label>
               <Textarea 
                 id="description" 
                 placeholder="Detalhes completos do produto..." 
@@ -507,21 +513,43 @@ const AddEditProduct = () => {
               </div>
             </div>
             
-            {/* URL do Vídeo */}
-            <div className="grid gap-2">
-              <Label htmlFor="video_url" className="flex items-center">
-                <Video className="h-4 w-4 mr-2 text-muted-foreground" /> URL do Vídeo (Opcional)
-              </Label>
-              <Input 
-                id="video_url" 
-                placeholder="Ex: https://youtube.com/watch?v=..." 
-                className="font-sans rounded-lg" 
-                {...form.register("video_url")}
-              />
-              {form.formState.errors.video_url && (
-                <p className="text-destructive text-sm">{form.formState.errors.video_url.message}</p>
-              )}
-            </div>
+            <Separator />
+            
+            {/* Seção de Descrição Detalhada (Imagens e Vídeo) */}
+            <Collapsible defaultOpen={false}>
+                <CollapsibleTrigger asChild>
+                    <Button variant="outline" type="button" className="w-full justify-start font-heading rounded-xl border-dashed">
+                        <FileText className="h-4 w-4 mr-2" /> 
+                        Personalizar Descrição Detalhada (Opcional)
+                        <ChevronDown className="h-4 w-4 ml-auto data-[state=open]:hidden" />
+                        <ChevronUp className="h-4 w-4 ml-auto data-[state=closed]:hidden" />
+                    </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-4 space-y-6">
+                    {/* Gerenciador de Imagens Detalhadas */}
+                    <DetailedDescriptionManager
+                        initialImages={detailedImages}
+                        onImagesChange={setDetailedImages}
+                        isSubmitting={isSubmitting}
+                    />
+                    
+                    {/* URL do Vídeo */}
+                    <div className="grid gap-2">
+                      <Label htmlFor="video_url" className="flex items-center">
+                        <Video className="h-4 w-4 mr-2 text-muted-foreground" /> URL do Vídeo (Opcional)
+                      </Label>
+                      <Input 
+                        id="video_url" 
+                        placeholder="Ex: https://youtube.com/watch?v=..." 
+                        className="font-sans rounded-lg" 
+                        {...form.register("video_url")}
+                      />
+                      {form.formState.errors.video_url && (
+                        <p className="text-destructive text-sm">{form.formState.errors.video_url.message}</p>
+                      )}
+                    </div>
+                </CollapsibleContent>
+            </Collapsible>
 
             <Separator />
             

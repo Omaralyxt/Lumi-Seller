@@ -15,6 +15,12 @@ export interface Specification {
   value: string; // Ex: "200g", "8 GB"
 }
 
+// Tipagem para Imagens de Descrição Detalhada
+export interface DetailedImage {
+  url: string;
+  sort_order: number;
+}
+
 // Tipagem base para Product
 export interface Product {
   id: string;
@@ -25,6 +31,7 @@ export interface Product {
   shipping_cost: number | null;
   specifications: Specification[] | null; // Novo campo JSONB
   video_url: string | null; // Novo campo para URL do vídeo
+  detailed_images: DetailedImage[] | null; // Novo campo JSONB para imagens de descrição
   created_at: string;
 }
 

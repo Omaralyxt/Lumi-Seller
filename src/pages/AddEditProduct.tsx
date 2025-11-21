@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Save, Trash2, Image as ImageIcon, PlusCircle, X, Loader2, Package, ChevronDown, ChevronUp, List, Video, Tag, FileText, Power } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useForm } from "@/components/ui/form"; // Importação corrigida
+import { useForm } from "react-hook-form"; // Importação corrigida
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useStore } from "@/hooks/use-store";
